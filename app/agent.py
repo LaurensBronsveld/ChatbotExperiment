@@ -24,6 +24,11 @@ import logging
 
 from DatabaseManager import DatabaseManager
 
+
+
+# Set up logging configuration
+logging.basicConfig(level=logging.DEBUG)
+
 class HandbookChunk(LanceModel):
     chunk_id: str | None = None
     file: str | None = None
@@ -68,7 +73,7 @@ class Assistant_Agent():
         self.model = OpenAIModel('gpt-4o',
                                  api_key=os.environ.get("OPENAI_API_KEY"))
         
-        self.agent = Agent(self.model, result_type=ResponseModel)    
+        self.agent = Agent(self.model)    
         #self.agent = OpenAIAgent.agent
         self.history = [
                         {"role": "system", 
@@ -115,6 +120,27 @@ class Assistant_Agent():
             return response.data
         except Exception as e:
             return{"error": str(e)}
+        
+    async def generate_response_stream(self, query: str, use_rag: bool, use_ddrg: bool):
+        
+        self.history.append({'role': "user", "content": query})
+
+        complete_response = ""  # Store the response text as it is streamed
+        sources = ["test"]  # Store the sources as they are identified
+
+        try:
+            async with self.agent.run_stream(str(self.history)) as result:
+                async for message in result.stream():
+
+                    new_content = message[len(complete_response):]
+                    complete_response = message  
+                    if new_content:
+                        yield new_content
+                    
+                # yield json.dumps({'content': '', 'sources': sources})
+                self.history.append({'role': "assistant", "content": complete_response})
+        except Exception as e:
+            yield json.dumps({"error": str(e)})
 
 db_manager = DatabaseManager("./data/lancedb")
 assistant = Assistant_Agent(db_manager)

@@ -20,7 +20,6 @@ db_manager = DatabaseManager(uri)
 assistant = Assistant_Agent(db_manager)
 
 
-
 @app.post("/assistant/")
 async def get_response(request: QueryModel) -> ResponseModel:
     """
@@ -28,12 +27,12 @@ async def get_response(request: QueryModel) -> ResponseModel:
     Returns a json with the answer and sources used.
     """
 
-    response = await assistant.generate_response(
+    response_stream = assistant.generate_response_stream(
         query = request.query,
         use_rag = request.use_rag,
         use_ddrg = request.use_ddrg
         )
-    return response
+    return StreamingResponse(response_stream, media_type="text/event-stream")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, log_level="info")

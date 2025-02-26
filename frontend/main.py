@@ -22,16 +22,25 @@ def get_response(query: str, use_rag = True, use_ddrg = False):
         response = data['response']
         sources = data['sources']
        
-        return response, sources
+        return response
     except Exception as e:
         print({"error": e})
         
-
-# stream response to simulate typing. This is kinda slow so now so it is not used.
-def stream_response(response):
-    for word in response.split():
-        yield word + " "
-        time.sleep(0.05)
+def get_streaming_resonse(query: str, use_rag = True, use_ddrg = False):
+    try:
+        response = requests.post(
+            f"{API_URL}/assistant/",
+            json={
+                "query": query,
+                'use_rag': use_rag,
+                "use_ddrg": use_ddrg
+            },
+            stream=True,
+            headers = {'Accept': 'text/event-stream'}
+            )
+        return response
+    except Exception as e:
+        print({"error": e})
 
 def main():
     
@@ -56,16 +65,20 @@ def main():
 
         # Display assistant response
         try:
-            response, sources = get_response(prompt)
-            with st.chat_message('assistant'):
-                st.markdown(response)
-            
-            for source in sources:
-                with st.sidebar:
-                    
-                    st.write(source)
+            response_stream = get_streaming_resonse(prompt)
 
-            st.session_state.messages.append({"role": 'assistant', 'content': response})
+            if response_stream:
+                with st.chat_message('assistant'):
+                    message_placeholder = st.empty()
+                    full_response = ""
+
+                    #process streaming response
+                    for chunk in response_stream.iter_content(chunk_size=None, decode_unicode=True):
+                        if chunk:
+                            full_response+=chunk #add chunk to response
+                            message_placeholder.markdown(full_response) #display updated response
+                    
+                    st.session_state.messages.append({"role": 'assistant', 'content': full_response})
         except Exception as e:
             print("something went wrong with the response. Error: " + e)
 
