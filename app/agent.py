@@ -108,13 +108,13 @@ class Assistant_Agent():
         use_rag: bool = True
         use_ddrg: bool = False
 
-    async def generate_response(self, query: str, use_rag: bool, use_ddrg: bool):
-        self.history.append({'role': "user", "content": query})
+    async def generate_response(self, query: str):
+        self.history.append({'role': "user", "content": "hello"})
         try:
-            response = await self.agent.run(str(self.history))
-            return response.data
+            async for chunk in self.agent.run_stream(str(self.history)):
+                yield chunk
         except Exception as e:
-            return{"error": str(e)}
+            yield {"error": str(e)}
 
 db_manager = DatabaseManager("./data/lancedb")
 assistant = Assistant_Agent(db_manager)
