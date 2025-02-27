@@ -12,14 +12,13 @@ from lancedb.embeddings import get_registry
 import asyncio
 from duckduckgo_search import DDGS
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.models.openai import OpenAIModel
-from models.chat import ResponseModel, QueryModel
+from models.chat import ResponseModel, QueryModel, ResponseDict
 from agents.LLMs import OpenAIAgent
 
-# If you're using logging for debugging
 import logging
 
 from DatabaseManager import DatabaseManager
@@ -28,6 +27,13 @@ from DatabaseManager import DatabaseManager
 
 # Set up logging configuration
 logging.basicConfig(level=logging.DEBUG)
+
+# Silence specific noisy libraries
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("opentelemetry").setLevel(logging.ERROR)
+logging.getLogger("pydantic_ai").setLevel(logging.WARNING)
 
 class HandbookChunk(LanceModel):
     chunk_id: str | None = None
@@ -73,7 +79,7 @@ class Assistant_Agent():
         self.model = OpenAIModel('gpt-4o',
                                  api_key=os.environ.get("OPENAI_API_KEY"))
         
-        self.agent = Agent(self.model)    
+        self.agent = Agent(self.model, result_type=ResponseDict)    
         #self.agent = OpenAIAgent.agent
         self.history = [
                         {"role": "system", 
@@ -87,7 +93,7 @@ class Assistant_Agent():
                         3. List the specific pages and sections used as sources including an url to the page when possible.
                         
                         You can not use your internal knowledge
-                        You must use the search_database tool to answer Gitlab Handbook related questions. Please explain what went wrong if you cant retrieve relevant information using the RAG_tool
+                        You must use the search_database tool to answer Gitlab Handbook related questions. Please explain what went wrong if you cant retrieve relevant information using the search_database
                         """}
                     ]
 
@@ -125,20 +131,40 @@ class Assistant_Agent():
         
         self.history.append({'role': "user", "content": query})
 
-        complete_response = ""  # Store the response text as it is streamed
-        sources = ["test"]  # Store the sources as they are identified
+        complete_content = ""  # Store the response text as it is streamed
+        sources = []  # Store the sources as they are identified
+        new_content = ""
 
         try:
             async with self.agent.run_stream(str(self.history)) as result:
-                async for message in result.stream():
-
-                    new_content = message[len(complete_response):]
-                    complete_response = message  
-                    if new_content:
-                        yield new_content
+                async for structured_result, last in result.stream_structured(debounce_by=0.01):
+                    try:
+                        chunk = await result.validate_structured_result(
+                            structured_result, allow_partial=not last
+                        )
+                        
+                        #determine new content
+                        if chunk.get('response'):
+                            content = chunk.get('response')
+                            new_content = content[len(complete_content):]
+                            complete_content = content
+                        
+                        response = {
+                            "response": new_content,
+                            'sources': chunk.get('sources')
+                        }
+                        yield(json.dumps(response).encode('utf-8') + b'\n')
                     
-                # yield json.dumps({'content': '', 'sources': sources})
-                self.history.append({'role': "assistant", "content": complete_response})
+                    except ValidationError as exc:
+                        if all(
+                            e['type'] == 'missing' and e['loc'] == ('response',)
+                            for e in exc.errors()
+                        ):
+                            continue
+                        else:
+                            raise
+
+                self.history.append({'role': "assistant", "content": complete_content})
         except Exception as e:
             yield json.dumps({"error": str(e)})
 

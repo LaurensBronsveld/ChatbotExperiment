@@ -38,12 +38,12 @@ def get_streaming_resonse(query: str, use_rag = True, use_ddrg = False):
             stream=True,
             headers = {'Accept': 'text/event-stream'}
             )
+        print(response)
         return response
     except Exception as e:
         print({"error": e})
 
 def main():
-    
     st.title("chatbot experiment")
     # Initialize message history
     if "messages" not in st.session_state:
@@ -66,19 +66,28 @@ def main():
         # Display assistant response
         try:
             response_stream = get_streaming_resonse(prompt)
-
+            sources = []
             if response_stream:
                 with st.chat_message('assistant'):
                     message_placeholder = st.empty()
                     full_response = ""
-
+                    data = ""
                     #process streaming response
                     for chunk in response_stream.iter_content(chunk_size=None, decode_unicode=True):
-                        if chunk:
-                            full_response+=chunk #add chunk to response
-                            message_placeholder.markdown(full_response) #display updated response
-                    
+                        data = json.loads(chunk)
+                        if data['response']:
+                                response = data['response']
+                
+                                full_response+=response #add chunk to response
+                                message_placeholder.markdown(full_response) #display updated response
+                   
+                    sources = data['sources']       
+
                     st.session_state.messages.append({"role": 'assistant', 'content': full_response})
+                
+                with st.sidebar:
+                    for source in sources:
+                        st.write(source)
         except Exception as e:
             print("something went wrong with the response. Error: " + e)
 
