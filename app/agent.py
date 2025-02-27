@@ -12,7 +12,7 @@ from lancedb.embeddings import get_registry
 import asyncio
 from duckduckgo_search import DDGS
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.models.openai import OpenAIModel
@@ -28,6 +28,14 @@ from DatabaseManager import DatabaseManager
 
 # Set up logging configuration
 logging.basicConfig(level=logging.DEBUG)
+
+# Silence specific noisy libraries
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("opentelemetry").setLevel(logging.ERROR)
+logging.getLogger("pydantic_ai").setLevel(logging.WARNING)
+
 
 class HandbookChunk(LanceModel):
     chunk_id: str | None = None
@@ -73,7 +81,7 @@ class Assistant_Agent():
         self.model = OpenAIModel('gpt-4o',
                                  api_key=os.environ.get("OPENAI_API_KEY"))
         
-        self.agent = Agent(self.model)    
+        self.agent = Agent(self.model, result_type=ResponseModel)    
         #self.agent = OpenAIAgent.agent
         self.history = [
                         {"role": "system", 
@@ -130,30 +138,48 @@ class Assistant_Agent():
 
         try:
             async with self.agent.run_stream(str(self.history)) as result:
-                async for message in result.stream():
+                async for message, last in result.stream_structured(debounce_by=0.01):
+                # For tool calls, we don't yield anything to the client
+                # Just log for debugging if needed
+                    try:
+                        profile = await result.validate_structured_result(  
 
-                    new_content = message[len(complete_response):]
-                    complete_response = message  
-                    if new_content:
-                        yield new_content
+
+                        message,
+                        allow_partial=not last
+                            )
+                        logging.debug(profile)
+                        yield(profile)
+                    except ValidationError:
+                        continue
+                
+                # logging.debug("DEBUG: Passed tool call check")
+                # if hasattr(result, "stream_structured"):
+                #     logging.debug("DEBUG: structured stream detected")
+                #     async for part, last in result.stream_structured():
+
+                #         new_content = part[len(complete_response):]
+                #         complete_response = part  
+                #         if new_content:
+                #             yield new_content
                     
                 # yield json.dumps({'content': '', 'sources': sources})
                 self.history.append({'role': "assistant", "content": complete_response})
         except Exception as e:
             yield json.dumps({"error": str(e)})
 
-db_manager = DatabaseManager("./data/lancedb")
-assistant = Assistant_Agent(db_manager)
+# db_manager = DatabaseManager("./data/lancedb")
+# assistant = Assistant_Agent(db_manager)
 
-async def main():
+# async def main():
     
-    response = await assistant.generate_response("What is GitLab's approach to paid time off (PTO)", True, False)
-    print(response)
+#     response = await assistant.generate_response("What is GitLab's approach to paid time off (PTO)", True, False)
+#     print(response)
 
-      # Wait for all pending tasks to complete (IMPORTANT!)
-    pending = asyncio.all_tasks()
-    while pending:  # Check if there are any pending tasks.
-        await asyncio.gather(*pending) # * unpacks the set of tasks.
+#       # Wait for all pending tasks to complete (IMPORTANT!)
+#     pending = asyncio.all_tasks()
+#     while pending:  # Check if there are any pending tasks.
+#         await asyncio.gather(*pending) # * unpacks the set of tasks.
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())
