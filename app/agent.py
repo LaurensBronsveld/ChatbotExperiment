@@ -37,7 +37,7 @@ logging.getLogger("pydantic_ai").setLevel(logging.WARNING)
 
 class HandbookChunk(LanceModel):
     chunk_id: str | None = None
-    file: str | None = None
+    source_url: str | None = None
     chunk: str | None = None
 
 
@@ -58,7 +58,7 @@ class Assistant_Agent():
                     
                     chunk_dict = {
                         "chunk_id": chunk.chunk_id,
-                        "file": chunk.file,
+                        "source_url": chunk.source_url,
                         "chunk": chunk.chunk
                     }
                     json_results.append(chunk_dict)
@@ -90,10 +90,14 @@ class Assistant_Agent():
                         Your workflow should go like this:
                         1. use 'search_database' to retrieve relevant information from your database to help answer the question
                         2. Answer the question as detailed as possible while referring to the handbook pages.
-                        3. List the specific pages and sections used as sources including an url to the page when possible.
+                        3. List the urls from the database entries you used to form your answer as sources. The urls are available in the "source_url" column of the database.
+                        if you cannot access the sources from the "source_url" column, please say so
                         
-                        You can not use your internal knowledge
                         You must use the search_database tool to answer Gitlab Handbook related questions. Please explain what went wrong if you cant retrieve relevant information using the search_database
+                        You can not use your internal knowledge, or other websites from the internet.
+                        Do not link to other pages as source for your information, all sources should be in the database.
+                        Do not list sources 
+                        
                         """}
                     ]
 
@@ -108,7 +112,7 @@ class Assistant_Agent():
     def table(self):
         if self._table is None:
             try:
-                self._table = self.dbmanager.get_table('embedded_handbook')
+                self._table = self.dbmanager.get_table("embedded_handbook_with_urls")
             except Exception as e:
                 print(f"error accesssing table: {str(e)}")
                 raise
@@ -127,6 +131,8 @@ class Assistant_Agent():
         except Exception as e:
             return{"error": str(e)}
         
+
+
     async def generate_response_stream(self, query: str, use_rag: bool, use_ddrg: bool):
         
         self.history.append({'role': "user", "content": query})
@@ -137,6 +143,7 @@ class Assistant_Agent():
 
         try:
             async with self.agent.run_stream(str(self.history)) as result:
+                
                 async for structured_result, last in result.stream_structured(debounce_by=0.01):
                     try:
                         chunk = await result.validate_structured_result(
@@ -154,7 +161,7 @@ class Assistant_Agent():
                             'sources': chunk.get('sources')
                         }
                         yield(json.dumps(response).encode('utf-8') + b'\n')
-                    
+
                     except ValidationError as exc:
                         if all(
                             e['type'] == 'missing' and e['loc'] == ('response',)
@@ -165,6 +172,8 @@ class Assistant_Agent():
                             raise
 
                 self.history.append({'role': "assistant", "content": complete_content})
+                
+
         except Exception as e:
             yield json.dumps({"error": str(e)})
 
