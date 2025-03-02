@@ -3,7 +3,7 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.anthropic import AnthropicModel
-from models.chat import ResponseModel, QueryModel
+from models.models import ResponseModel, QueryModel
 
 class OpenAIAgent:
     model = OpenAIModel('gpt-4o', api_key=os.environ.get("OPENAI_API_KEY"))

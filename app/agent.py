@@ -16,7 +16,7 @@ from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.models.openai import OpenAIModel
-from models.chat import ResponseModel, QueryModel, ResponseDict
+from models.models import ResponseDict, RequestModel, ResponseModel
 from agents.LLMs import OpenAIAgent
 
 import logging
@@ -123,19 +123,11 @@ class Assistant_Agent():
         use_rag: bool = True
         use_ddrg: bool = False
 
-    async def generate_response(self, query: str, use_rag: bool, use_ddrg: bool):
-        self.history.append({'role': "user", "content": query})
-        try:
-            response = await self.agent.run(str(self.history))
-            return response.data
-        except Exception as e:
-            return{"error": str(e)}
-        
-
-
-    async def generate_response_stream(self, query: str, use_rag: bool, use_ddrg: bool):
-        
-        self.history.append({'role': "user", "content": query})
+    async def generate_response_stream(self, request: RequestModel):
+        logging.debug(request)
+        logging.debug(request.user)
+        logging.debug(request.user['question'])
+        self.history.append({'role': "user", "content": request.user['question']})
 
         complete_content = ""  # Store the response text as it is streamed
         sources = []  # Store the sources as they are identified

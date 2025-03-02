@@ -4,6 +4,7 @@ import asyncio
 import time
 import json
 
+
 API_URL = "http://127.0.0.1:8000"
 
 def get_response(query: str, use_rag = True, use_ddrg = False):
@@ -11,11 +12,19 @@ def get_response(query: str, use_rag = True, use_ddrg = False):
         sources = []
         result = requests.post(
             f"{API_URL}/assistant/",
-            json={
-                "query": query,
-                'use_rag': use_rag,
-                "use_ddrg": use_ddrg
-            }
+            json={"metadata": {"language": "nl",
+                        "session_id": None,
+                        "tools": [{ "name": "HR", "enabled": True }]
+                    }, 
+                    "user": {
+                        "question": "Hoeveel dagen vakantie heb ik per jaar?",
+                        "context": [
+                            { "type": "file", "URL": "" }, 
+                            { "type": "snippet", "text": ""},
+                            { "type": "url", "url": "https://example.com" }
+                        ]
+                    }
+                    }
             )
        
         data = result.json()
@@ -26,15 +35,23 @@ def get_response(query: str, use_rag = True, use_ddrg = False):
     except Exception as e:
         print({"error": e})
         
-def get_streaming_resonse(query: str, use_rag = True, use_ddrg = False):
+def get_streaming_resonse(query: str):
     try:
         response = requests.post(
             f"{API_URL}/assistant/",
-            json={
-                "query": query,
-                'use_rag': use_rag,
-                "use_ddrg": use_ddrg
-            },
+            json={"metadata": {"language": "nl",
+                        "session_id": None,
+                        "tools": [{ "name": "HR", "enabled": True }]
+                    }, 
+                    "user": {
+                        "question": query,
+                        "context": [
+                            { "type": "file", "URL": "" }, 
+                            { "type": "snippet", "text": ""},
+                            { "type": "url", "url": "https://example.com" }
+                        ]
+                    }
+                    },
             stream=True,
             headers = {'Accept': 'text/event-stream'}
             )

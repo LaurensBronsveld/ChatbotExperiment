@@ -10,7 +10,9 @@ import pandas as pd
 
 from agent import Assistant_Agent
 from DatabaseManager import DatabaseManager
-from models.chat import ResponseModel, QueryModel
+from models.models import RequestModel, ResponseModel
+import json
+
 
 
 uri = "./data/lancedb"
@@ -21,16 +23,15 @@ assistant = Assistant_Agent(db_manager)
 
 
 @app.post("/assistant/")
-async def get_response(request: QueryModel) -> ResponseModel:
+async def get_response(request: RequestModel) -> ResponseModel:
     """
     Generate a response from the assistant agent.
     Returns a json with the answer and sources used.
     """
 
     response_stream = assistant.generate_response_stream(
-        query = request.query,
-        use_rag = request.use_rag,
-        use_ddrg = request.use_ddrg
+        request = request
+
         )
     return StreamingResponse(response_stream, media_type="text/event-stream")
 
