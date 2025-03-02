@@ -92,8 +92,8 @@ def main():
                     #process streaming response
                     for chunk in response_stream.iter_content(chunk_size=None, decode_unicode=True):
                         data = json.loads(chunk)
-                        if data['response']:
-                                response = data['response']
+                        if data['content']:
+                                response = data['content']
                 
                                 full_response+=response #add chunk to response
                                 message_placeholder.markdown(full_response) #display updated response

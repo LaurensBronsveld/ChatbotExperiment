@@ -6,6 +6,8 @@ from typing import List
 import json
 import os
 import lancedb
+
+import uuid
 from lancedb.pydantic import LanceModel, Vector
 from lancedb.embeddings import get_registry
 
@@ -18,6 +20,7 @@ from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.models.openai import OpenAIModel
 from models.models import ResponseDict, RequestModel, ResponseModel
 from agents.LLMs import OpenAIAgent
+
 
 import logging
 
@@ -91,12 +94,15 @@ class Assistant_Agent():
                         1. use 'search_database' to retrieve relevant information from your database to help answer the question
                         2. Answer the question as detailed as possible while referring to the handbook pages.
                         3. List the urls from the database entries you used to form your answer as sources. The urls are available in the "source_url" column of the database.
-                        if you cannot access the sources from the "source_url" column, please say so
                         
-                        You must use the search_database tool to answer Gitlab Handbook related questions. Please explain what went wrong if you cant retrieve relevant information using the search_database
+                        You must use the search_database tool to answer Gitlab Handbook related questions.
                         You can not use your internal knowledge, or other websites from the internet.
                         Do not link to other pages as source for your information, all sources should be in the database.
-                        Do not list sources 
+
+                        The content part in your output should only contain your answer to the question, keep all other metadata and sources out of it.
+                        Do not list sources in the content part of your response.
+                        Try to determine what the question classification is, for example technical, HR or general information etc
+                        Suggest a few follow up questions the user might have after your response.
                         
                         """}
                     ]
@@ -124,14 +130,16 @@ class Assistant_Agent():
         use_ddrg: bool = False
 
     async def generate_response_stream(self, request: RequestModel):
-        logging.debug(request)
-        logging.debug(request.user)
-        logging.debug(request.user['question'])
+        
         self.history.append({'role': "user", "content": request.user['question']})
 
         complete_content = ""  # Store the response text as it is streamed
         sources = []  # Store the sources as they are identified
         new_content = ""
+        
+        #if session_id is null, generate one
+        if not request.metadata['session_id']:
+            request.metadata['session_id'] = uuid.uuid4()
 
         try:
             async with self.agent.run_stream(str(self.history)) as result:
@@ -143,17 +151,26 @@ class Assistant_Agent():
                         )
                         
                         #determine new content
-                        if chunk.get('response'):
-                            content = chunk.get('response')
+                        if chunk.get('content'):
+                            content = chunk.get('content')
                             new_content = content[len(complete_content):]
                             complete_content = content
                         
-                        response = {
-                            "response": new_content,
-                            'sources': chunk.get('sources')
-                        }
+                       
+                        response = ResponseDict(
+                            content=new_content, 
+                            sources=chunk.get('sources'),
+                            tools_used = chunk.get("tools_used"),
+                            able_to_answer=chunk.get("able_to_answer"),
+                            question_classification= chunk.get('question_classification'),
+                            session_id=None,
+                            trace_id=None,
+                            share_token="",
+                            follow_up_questions=chunk.get('follow_up_questions'))
+                        
+                        
                         yield(json.dumps(response).encode('utf-8') + b'\n')
-
+                
                     except ValidationError as exc:
                         if all(
                             e['type'] == 'missing' and e['loc'] == ('response',)
@@ -162,7 +179,8 @@ class Assistant_Agent():
                             continue
                         else:
                             raise
-
+                
+                logging.debug(json.dumps(response).encode('utf-8') + b'\n')
                 self.history.append({'role': "assistant", "content": complete_content})
                 
 
