@@ -18,13 +18,15 @@ from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.models.openai import OpenAIModel
-from models.models import ResponseDict, RequestModel, ResponseModel
+from components.system_prompts import get_chatbot_prompt
+
+from models.models import ResponseDict, RequestModel, HandbookChunk
 from agents.LLMs import OpenAIAgent
 
 
 import logging
 
-from DatabaseManager import DatabaseManager
+from components.DatabaseManager import DatabaseManager
 
 
 
@@ -38,10 +40,7 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("opentelemetry").setLevel(logging.ERROR)
 logging.getLogger("pydantic_ai").setLevel(logging.WARNING)
 
-class HandbookChunk(LanceModel):
-    chunk_id: str | None = None
-    source_url: str | None = None
-    chunk: str | None = None
+
 
 
 class Assistant_Agent():
@@ -49,14 +48,9 @@ class Assistant_Agent():
     def search_database(self, ctx: RunContext, query: str):
             try:
                 
-                # client = OpenAI()
-                # query_embedding = client.embeddings.create(
-                # input=query,
-                # model="text-embedding-3-large"
-                # ).data[0].embedding
-
                 results = self.table.search(query, vector_column_name='vector').limit(5).to_pydantic(HandbookChunk)
                 json_results = []
+                
                 for chunk in results:
                     
                     chunk_dict = {
@@ -82,32 +76,9 @@ class Assistant_Agent():
         self.model = OpenAIModel('gpt-4o',
                                  api_key=os.environ.get("OPENAI_API_KEY"))
         
-        self.agent = Agent(self.model, result_type=ResponseDict)    
-        #self.agent = OpenAIAgent.agent
-        self.history = [
-                        {"role": "system", 
-                         "content": """
-                        You are a helpful assistant who provides answers to questsions related to the Gitlab Handbook. 
-                        You have access to an embedded database containing the whole Gitlab Handbook
-                        Please use the "search_database" to retrieve relevant information from the Gitlab Handbook to help answer questions.
-                        Your workflow should go like this:
-                        1. use 'search_database' to retrieve relevant information from your database to help answer the question
-                        2. Answer the question as detailed as possible while referring to the handbook pages.
-                        3. List the urls from the database entries you used to form your answer as sources. The urls are available in the "source_url" column of the database.
-                        
-                        You must use the search_database tool to answer Gitlab Handbook related questions.
-                        You can not use your internal knowledge, or other websites from the internet.
-                        Do not link to other pages as source for your information, all sources should be in the database.
-
-                        The content part in your output should only contain your answer to the question, keep all other metadata and sources out of it.
-                        Do not list sources in the content part of your response.
-                        Try to determine what the question classification is, for example technical, HR or general information etc
-                        Suggest a few follow up questions the user might have after your response.
-                        
-                        """}
-                    ]
-
-        self.tokens = {'request': 0, 'response': 0, 'total': 0}
+        self.agent = Agent(self.model, result_type=ResponseDict, system_prompt= get_chatbot_prompt())    
+   
+        self.history = []
         self.dbmanager = db
         self._table = None
 
@@ -181,6 +152,7 @@ class Assistant_Agent():
                             raise
                 
                 logging.debug(json.dumps(response).encode('utf-8') + b'\n')
+                logging.debug(complete_content)
                 self.history.append({'role': "assistant", "content": complete_content})
                 
 

@@ -8,9 +8,9 @@ import uvicorn
 import pandas as pd
 
 
-from agent import Assistant_Agent
-from DatabaseManager import DatabaseManager
-from models.models import RequestModel, ResponseModel
+from components.agent import Assistant_Agent
+from components.DatabaseManager import DatabaseManager
+from models.models import RequestModel
 import json
 
 
@@ -23,7 +23,7 @@ assistant = Assistant_Agent(db_manager)
 
 
 @app.post("/assistant/")
-async def get_response(request: RequestModel) -> ResponseModel:
+async def get_response(request: RequestModel):
     """
     Generate a response from the assistant agent.
     Returns a json with the answer and sources used.
