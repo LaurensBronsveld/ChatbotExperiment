@@ -13,8 +13,6 @@ from components.DatabaseManager import DatabaseManager
 from models.models import RequestModel
 import json
 
-
-
 uri = "./data/lancedb"
 app = FastAPI()
 

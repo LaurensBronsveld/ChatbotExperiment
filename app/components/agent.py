@@ -16,6 +16,7 @@ from duckduckgo_search import DDGS
 from openai import OpenAI
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.messages import ToolCallPart, ToolReturnPart
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.models.openai import OpenAIModel
 from components.system_prompts import get_chatbot_prompt
@@ -50,15 +51,16 @@ class Assistant_Agent():
                 
                 results = self.table.search(query, vector_column_name='vector').limit(5).to_pydantic(HandbookChunk)
                 json_results = []
-                
+                id = 1
                 for chunk in results:
                     
                     chunk_dict = {
-                        "chunk_id": chunk.chunk_id,
+                        "id": id,
                         "source_url": chunk.source_url,
                         "chunk": chunk.chunk
                     }
                     json_results.append(chunk_dict)
+                    id += 1
                 return json_results
             except Exception as e:
                 return{"error": str(e)}
@@ -100,21 +102,40 @@ class Assistant_Agent():
         use_rag: bool = True
         use_ddrg: bool = False
 
+    def get_tool_results(self, result, tool_name):
+        content = []
+        sources = []
+        call_count = 0
+        for message in result.all_messages():
+                    for part in message.parts:
+                        if isinstance(part, ToolReturnPart) and part.tool_name == tool_name:
+                            call_count += 1
+                            logging.debug(call_count)
+                            content.extend(part.content)
+                            #sources.append(f"{part.content['id']}. {part.content['source_url']}")
+
+        for source in content: 
+            # logging.debug(f"{source['id']}. {source['source_url']}")
+            sources.append(f"{source['id']}. {source['source_url']}")
+
+        return sources
+
     async def generate_response_stream(self, request: RequestModel):
         
         self.history.append({'role': "user", "content": request.user['question']})
 
         complete_content = ""  # Store the response text as it is streamed
-        sources = []  # Store the sources as they are identified
         new_content = ""
         
-        #if session_id is null, generate one
+        
+        # if session_id is null, generate one
         if not request.metadata['session_id']:
-            request.metadata['session_id'] = uuid.uuid4()
+            request.metadata['session_id'] = str(uuid.uuid4())
 
         try:
             async with self.agent.run_stream(str(self.history)) as result:
-                
+                sources = self.get_tool_results(result, 'search_database')
+                logging.debug(result)
                 async for structured_result, last in result.stream_structured(debounce_by=0.01):
                     try:
                         chunk = await result.validate_structured_result(
@@ -130,11 +151,11 @@ class Assistant_Agent():
                        
                         response = ResponseDict(
                             content=new_content, 
-                            sources=chunk.get('sources'),
+                            sources=sources,
                             tools_used = chunk.get("tools_used"),
                             able_to_answer=chunk.get("able_to_answer"),
                             question_classification= chunk.get('question_classification'),
-                            session_id=None,
+                            session_id=request.metadata['session_id'],
                             trace_id=None,
                             share_token="",
                             follow_up_questions=chunk.get('follow_up_questions'))
@@ -151,8 +172,8 @@ class Assistant_Agent():
                         else:
                             raise
                 
-                logging.debug(json.dumps(response).encode('utf-8') + b'\n')
-                logging.debug(complete_content)
+                # logging.debug(json.dumps(response).encode('utf-8') + b'\n')
+                # logging.debug(complete_content)
                 self.history.append({'role': "assistant", "content": complete_content})
                 
 

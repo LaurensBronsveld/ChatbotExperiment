@@ -105,6 +105,7 @@ def main():
                 with st.sidebar:
                     for source in sources:
                         st.write(source)
+                
         except Exception as e:
             print("something went wrong with the response. Error: " + e)
 
