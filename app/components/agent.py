@@ -6,6 +6,7 @@ from typing import List
 import json
 import os
 import lancedb
+import re
 
 import uuid
 from lancedb.pydantic import LanceModel, Vector
@@ -21,8 +22,8 @@ from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.models.openai import OpenAIModel
 from components.system_prompts import get_chatbot_prompt
 
-from models.models import ResponseDict, RequestModel, HandbookChunk
-from agents.LLMs import OpenAIAgent
+from models.models import *
+from agents.LLMs import get_model
 
 
 import logging
@@ -46,14 +47,14 @@ logging.getLogger("pydantic_ai").setLevel(logging.WARNING)
 
 class Assistant_Agent():
 
+
     def search_database(self, ctx: RunContext, query: str):
             try:
-                
                 results = self.table.search(query, vector_column_name='vector').limit(5).to_pydantic(HandbookChunk)
                 json_results = []
                 id = 1
+
                 for chunk in results:
-                    
                     chunk_dict = {
                         "id": id,
                         "source_url": chunk.source_url,
@@ -65,18 +66,10 @@ class Assistant_Agent():
             except Exception as e:
                 return{"error": str(e)}
     
-    def ddg_search(self, ctx: RunContext, query: str):
-        try:
-            with DDGS() as ddgs:
-                results = [r for r in ddgs.text(query, max_results=5)]
-                return {"results": results}
-        except Exception as e:
-            return {"error": str(e)}
 
-    def __init__(self, db: DatabaseManager):
+    def __init__(self, db: DatabaseManager, model_provider, model_name: str):
         
-        self.model = OpenAIModel('gpt-4o',
-                                 api_key=os.environ.get("OPENAI_API_KEY"))
+        self.model = get_model(model_provider, model_name)
         
         self.agent = Agent(self.model, result_type=ResponseDict, system_prompt= get_chatbot_prompt())    
    
@@ -97,46 +90,52 @@ class Assistant_Agent():
                 raise
         return self._table
     
-    class QueryModel(BaseModel):
-        query: str
-        use_rag: bool = True
-        use_ddrg: bool = False
-
+  
     def get_tool_results(self, result, tool_name):
         content = []
         sources = []
-        call_count = 0
+        
+        # get resuls from tool call out of Result object
         for message in result.all_messages():
+                    
                     for part in message.parts:
                         if isinstance(part, ToolReturnPart) and part.tool_name == tool_name:
-                            call_count += 1
-                            logging.debug(call_count)
                             content.extend(part.content)
                             #sources.append(f"{part.content['id']}. {part.content['source_url']}")
 
+        # create source objects 
         for source in content: 
-            # logging.debug(f"{source['id']}. {source['source_url']}")
-            sources.append(f"{source['id']}. {source['source_url']}")
-
+            url_regex = r"^(https?:\/\/|www\.)\S+$"   # regex which matches most urls starting with http(s)// or www.
+            uri_regex = r"^(?:[a-zA-Z]:\\|\/)[^\s]*$" # regex which matches absolute file paths in windows and unix systems
+            # check type of source (rough implementation, probably better to do this while building database)
+           
+            if re.match(url_regex, source['source_url']):
+                sources.append(SourceDict(id = source['id'], type = 'url', url=source["source_url"], used=False))
+            elif re.match(uri_regex, source['source_url']):
+                sources.append(SourceDict(id = source["id"], type = 'file', uri=source["source_url"], used=False))
+            else:
+                sources.append(SourceDict(id = source['id'], type = 'snippet', text="some text", used=False))
+        
         return sources
 
+   
+
     async def generate_response_stream(self, request: RequestModel):
-        
         self.history.append({'role': "user", "content": request.user['question']})
 
         complete_content = ""  # Store the response text as it is streamed
         new_content = ""
         
-        
         # if session_id is null, generate one
         if not request.metadata['session_id']:
             request.metadata['session_id'] = str(uuid.uuid4())
-
+    
         try:
             async with self.agent.run_stream(str(self.history)) as result:
+                
                 sources = self.get_tool_results(result, 'search_database')
-                logging.debug(result)
-                async for structured_result, last in result.stream_structured(debounce_by=0.01):
+                
+                async for structured_result, last in result.stream_structured(debounce_by=0.01):            
                     try:
                         chunk = await result.validate_structured_result(
                             structured_result, allow_partial=not last
@@ -147,8 +146,14 @@ class Assistant_Agent():
                             content = chunk.get('content')
                             new_content = content[len(complete_content):]
                             complete_content = content
-                        
-                       
+                        # determine used sources
+                        cite_regex = r"\[@(\d+)\]"   #regex which matches citations in this format [@X], with X being any number
+                        citations = re.findall(cite_regex, complete_content)
+                    
+                        for source in sources:
+                            if str(source.get('id')) in citations:
+                                source['used'] = True
+
                         response = ResponseDict(
                             content=new_content, 
                             sources=sources,
@@ -160,9 +165,8 @@ class Assistant_Agent():
                             share_token="",
                             follow_up_questions=chunk.get('follow_up_questions'))
                         
-                        
                         yield(json.dumps(response).encode('utf-8') + b'\n')
-                
+
                     except ValidationError as exc:
                         if all(
                             e['type'] == 'missing' and e['loc'] == ('response',)
@@ -171,27 +175,29 @@ class Assistant_Agent():
                             continue
                         else:
                             raise
+                   
                 
-                # logging.debug(json.dumps(response).encode('utf-8') + b'\n')
-                # logging.debug(complete_content)
+                
+                logging.debug(json.dumps(response).encode('utf-8') + b'\n')
+                logging.debug(complete_content)
                 self.history.append({'role': "assistant", "content": complete_content})
                 
 
         except Exception as e:
             yield json.dumps({"error": str(e)})
 
-db_manager = DatabaseManager("./data/lancedb")
-assistant = Assistant_Agent(db_manager)
+# db_manager = DatabaseManager("./data/lancedb")
+# assistant = Assistant_Agent(db_manager)
 
-async def main():
+# async def main():
     
-    response = await assistant.generate_response("What is GitLab's approach to paid time off (PTO)", True, False)
-    print(response)
+#     response = await assistant.generate_response("What is GitLab's approach to paid time off (PTO)", True, False)
+#     print(response)
 
-      # Wait for all pending tasks to complete (IMPORTANT!)
-    pending = asyncio.all_tasks()
-    while pending:  # Check if there are any pending tasks.
-        await asyncio.gather(*pending) # * unpacks the set of tasks.
+#       # Wait for all pending tasks to complete (IMPORTANT!)
+#     pending = asyncio.all_tasks()
+#     while pending:  # Check if there are any pending tasks.
+#         await asyncio.gather(*pending) # * unpacks the set of tasks.
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())

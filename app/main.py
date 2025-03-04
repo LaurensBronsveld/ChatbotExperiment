@@ -13,18 +13,21 @@ from components.DatabaseManager import DatabaseManager
 from models.models import RequestModel
 import json
 
-uri = "./data/lancedb"
-app = FastAPI()
+# setup
+MODEL_PROVIDER = "open-ai"
+MODEL_NAME = "gpt-4o"
+DATABASE_LOCATION = "./data/lancedb"
 
-db_manager = DatabaseManager(uri)
-assistant = Assistant_Agent(db_manager)
+app = FastAPI()
+db_manager = DatabaseManager(DATABASE_LOCATION)
+assistant = Assistant_Agent(db_manager, MODEL_PROVIDER, MODEL_NAME)
 
 
 @app.post("/assistant/")
 async def get_response(request: RequestModel):
     """
     Generate a response from the assistant agent.
-    Returns a json with the answer and sources used.
+    Returns a streaming response with the chatbot response and other metadata defined in the responsedict class.
     """
 
     response_stream = assistant.generate_response_stream(

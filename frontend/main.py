@@ -107,7 +107,7 @@ def main():
                         st.write(source)
                 
         except Exception as e:
-            print("something went wrong with the response. Error: " + e)
+            print(f"something went wrong with the response. Error: {e}")
 
         
    
