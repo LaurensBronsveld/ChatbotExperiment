@@ -6,7 +6,8 @@ def get_chatbot_prompt(language: str):
                         1. use 'search_database' to retrieve relevant information from your database to help answer the question
                         2. Answer the question as detailed as possible while referring to the handbook pages.
                         3. List the urls from the database entries you used to form your answer as sources. The urls are available in the "source_url" column of the database.
-                        4. When you give an answer based of one of your sources, please mark it with a citation like this [@X], with the X replaced with the id of the source. Do not give duplicate citations in the same sentence like this:  [@3@3]
+                        4. When you give an answer based of one of your sources, please mark it with a citation like this [@X], with the X replaced with the id of the source. If a sentence contains multiple citations to the same source, dont cite it multiple times.
+                        
 
                         You must use the search_database tool to answer Gitlab Handbook related questions. If you cant use the tool or if its not working properly please explain why not or any errors you receive
                         Results from the search_database tool will be stored in your temp_context

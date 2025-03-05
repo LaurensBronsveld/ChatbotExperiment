@@ -90,26 +90,21 @@ class Assistant_Agent():
         return self._history_table
     
     def get_chat_history(self, session_id: str):
-        results = self.history_table.search().where(f"session_id = '{session_id}'").limit(1).to_pydantic(ChatHistory)
-        if results:
-            return results[0].history
-        else:
-            return None
+        try:
+            results = self.history_table.search().where(f"session_id = '{session_id}'").limit(1).to_pydantic(ChatHistory)
+            if results:
+                return results[0].history, results[0].share_token
+            else:
+                return None
+        except Exception as e:
+            logging.error(f'error retrieving chat history: {e}')
     
     def update_chat_history(self, session_id: str, share_token: str, new_history: str):
-        logging.debug('test')
-        results = self.history_table.search().where(f"session_id = '{session_id}'").limit(1).to_pydantic(ChatHistory)
-        if results:
-            logging.debug("test2")
-            self.history_table.update(where=f"session_id = '{session_id}'", values={'history': new_history})
-        else:
-            logging.debug('test3')
-            data = [ChatHistory(session_id=session_id, share_token=share_token, history=new_history)]
-            self.history_table.add(data)
-            logging.debug(data)
-            #self.dbmanager.update_table(table_name="history_table", session_id=session_id, share_token=share_token, new_history=new_history)
-        
-
+        try:
+            self.dbmanager.update_chat_history(table_name="history_table", session_id=session_id, share_token=share_token, new_history=new_history)
+        except Exception as e:
+            logging.error(f"something went wrong updating history : {e}")
+       
     def get_tool_results(self, result, tool_name):
         content = []
         sources = []
@@ -137,87 +132,88 @@ class Assistant_Agent():
         
         return sources
 
-   
 
     async def generate_response_stream(self, request: RequestModel):
         history = []
-        # self.history.append({'role': "user", "content": request.user['question']})
 
         complete_content = ""  # Store the response text as it is streamed
         new_content = ""
-        
+        share_token = ""
+
         # if session_id is null, generate one
         if not request.metadata['session_id']:
+            logging.debug("test")
             request.metadata['session_id'] = str(uuid.uuid4())
-            request.metadata['share_token'] = str(uuid.uuid4())
+            share_token = str(uuid.uuid4())
         else:
-            # if session_id is there, load chat history 
-            history = json.loads(self.get_chat_history(request.metadata['session_id']))
+            # if session_id exists, retrieve chat history
+            history, share_token = self.get_chat_history(request.metadata['session_id'])
+            history = json.loads(history)
+            
 
         # add user question to history
         history.append({'role': "user", "content": request.user['question']})
-        logging.debug(history)
+        
         # get streaming response from agent
-        try:
-            async with self.agent.run_stream(str(history)) as result:
-                
-                sources = self.get_tool_results(result, 'search_database')
-                
-                async for structured_result, last in result.stream_structured(debounce_by=0.01):            
-                    try:
-                        chunk = await result.validate_structured_result(
-                            structured_result, allow_partial=not last
-                        )
-                        
-                        #determine new content
-                        if chunk.get('content'):
-                            content = chunk.get('content')
-                            new_content = content[len(complete_content):]
-                            complete_content = content
-
-                        # determine used sources
-                        cite_regex = r"\[@(\d+)\]"   #regex which matches citations in this format [@X], with X being any number
-                        citations = re.findall(cite_regex, complete_content)
+        retries = 3
+        for attempt in range(retries):
+            try:
+                async with self.agent.run_stream(str(history)) as result:
                     
-                        for source in sources:
-                            if str(source.get('id')) in citations:
-                                source['used'] = True
+                    sources = self.get_tool_results(result, 'search_database')
+                    
+                    async for structured_result, last in result.stream_structured(debounce_by=0.01):            
+                        try:
+                            chunk = await result.validate_structured_result(
+                                structured_result, allow_partial=not last
+                            )
+                            
+                            #determine new content
+                            if chunk.get('content'):
+                                content = chunk.get('content')
+                                new_content = content[len(complete_content):]
+                                complete_content = content
 
-                        # create response object
-                        response = ResponseDict(
-                            content=new_content, 
-                            sources=sources,
-                            tools_used = chunk.get("tools_used"),
-                            able_to_answer=chunk.get("able_to_answer"),
-                            question_classification= chunk.get('question_classification'),
-                            session_id=request.metadata['session_id'],
-                            trace_id=None,
-                            share_token="",
-                            follow_up_questions=chunk.get('follow_up_questions'))
+                            # determine used sources
+                            cite_regex = r"\[@(\d+)\]"   #regex which matches citations in this format [@X], with X being any number
+                            citations = re.findall(cite_regex, complete_content)
                         
-                        yield(json.dumps(response).encode('utf-8') + b'\n')
+                            for source in sources:
+                                if str(source.get('id')) in citations:
+                                    source['used'] = True
 
-                    except ValidationError as exc:
-                        if all(
-                            e['type'] == 'missing' and e['loc'] == ('response',)
-                            for e in exc.errors()
-                        ):
-                            continue
-                        else:
-                            raise
-                   
-                
-                
-                # logging.debug(json.dumps(response).encode('utf-8') + b'\n')
-                # logging.debug(complete_content)
-                history.append({'role': "assistant", "content": complete_content})
-                logging.debug("pretest")
-                self.update_chat_history(request.metadata['session_id'], "test", "test")
-                
+                            # create response object
+                            response = ResponseDict(
+                                content=new_content, 
+                                sources=sources,
+                                tools_used = chunk.get("tools_used"),
+                                able_to_answer=chunk.get("able_to_answer"),
+                                question_classification= chunk.get('question_classification'),
+                                session_id=request.metadata['session_id'],
+                                trace_id= None,
+                                share_token=share_token,
+                                follow_up_questions=chunk.get('follow_up_questions'))
+                            
+                            yield(json.dumps(response).encode('utf-8') + b'\n')
 
-        except Exception as e:
-            yield json.dumps({"error": str(e)})
+                        except ValidationError as exc:
+                            if all(
+                                e['type'] == 'missing' and e['loc'] == ('response',)
+                                for e in exc.errors()
+                            ):
+                                continue
+                            else:
+                                raise
+                    
 
+                    history.append({'role': "assistant", "content": complete_content})
+                    self.update_chat_history(request.metadata['session_id'], share_token, json.dumps(history))
+                    return
+            except Exception as e:
+                if attempt < retries - 1:
+                    await asyncio.sleep(2)
+                else:       
+                    logging.error(f"something went wrong with streaming the response: {e}")
 # db_manager = DatabaseManager("./data/lancedb")
 # assistant = Assistant_Agent(db_manager)
 

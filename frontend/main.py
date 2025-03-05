@@ -5,7 +5,8 @@ import json
 
 API_URL = "http://127.0.0.1:8000"
 
-def get_response(query: str, use_rag = True, use_ddrg = False):
+
+def get_response(query: str):
     try: 
         sources = []
         result = requests.post(
@@ -33,12 +34,12 @@ def get_response(query: str, use_rag = True, use_ddrg = False):
     except Exception as e:
         print({"error": e})
         
-def get_streaming_resonse(query: str):
+def get_streaming_resonse(query: str, session_id: str):
     try:
         response = requests.post(
             f"{API_URL}/assistant/",
             json={"metadata": {"language": "nl",
-                        "session_id": None,
+                        "session_id": session_id,
                         "tools": [{ "name": "HR", "enabled": True }]
                     }, 
                     "user": {
@@ -60,6 +61,11 @@ def get_streaming_resonse(query: str):
 
 def main():
     st.title("chatbot experiment")
+
+    # Initialize session_id in session_state if it doesn't exist
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = None
+
     # Initialize message history
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -80,7 +86,7 @@ def main():
 
         # Display assistant response
         try:
-            response_stream = get_streaming_resonse(prompt)
+            response_stream = get_streaming_resonse(prompt, st.session_state.session_id)
             sources = []
             if response_stream:
                 with st.chat_message('assistant'):
@@ -96,7 +102,9 @@ def main():
                                 full_response+=response #add chunk to response
                                 message_placeholder.markdown(full_response) #display updated response
                    
-                    sources = data['sources']       
+                    sources = data['sources']
+                    print(data['session_id'])
+                    st.session_state.session_id = data['session_id']       
 
                     st.session_state.messages.append({"role": 'assistant', 'content': full_response})
                 

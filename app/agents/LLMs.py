@@ -1,9 +1,12 @@
 import os
 from pydantic_ai import Agent, RunContext
+from dotenv import load_dotenv
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.anthropic import AnthropicModel
 
+# load environment variables
+load_dotenv()
 
 def get_model(provider: str, name: str):
     if provider.lower() == "open-ai":
