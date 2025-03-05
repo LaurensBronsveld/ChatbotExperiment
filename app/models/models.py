@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict, Required, NotRequired
-from typing import List, Optional, Union
+from typing import List, Optional
 from uuid import UUID
 from lancedb.pydantic import LanceModel
 

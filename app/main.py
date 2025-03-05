@@ -1,17 +1,11 @@
 from typing import Union
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-
-import lancedb
 import uvicorn
-import pandas as pd
-
 
 from components.agent import Assistant_Agent
 from components.DatabaseManager import DatabaseManager
 from models.models import RequestModel
-import json
 
 # setup
 MODEL_PROVIDER = "open-ai"

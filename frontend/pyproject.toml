@@ -1,0 +1,10 @@
+[project]
+name = "chatbotexperiment"
+version = "0.1.0"
+dependencies = [
+    "streamlit>=1.43.0",
+    
+]
+
+[tool.uv]
+# uv specific settings can be placed here.
