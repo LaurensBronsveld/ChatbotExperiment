@@ -103,7 +103,6 @@ def main():
                                 message_placeholder.markdown(full_response) #display updated response
                    
                     sources = data['sources']
-                    print(data['session_id'])
                     st.session_state.session_id = data['session_id']       
 
                     st.session_state.messages.append({"role": 'assistant', 'content': full_response})

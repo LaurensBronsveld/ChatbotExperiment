@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import List
 import json
 import os
+import httpx
 import re
 import uuid
 import asyncio
@@ -196,6 +197,9 @@ class Assistant_Agent():
                             
                             yield(json.dumps(response).encode('utf-8') + b'\n')
 
+                        except httpx.ReadError as e:
+                            logging.error(f"Streaming interrupted: {e}")
+                            break  # Stop streaming if connection is lost
                         except ValidationError as exc:
                             if all(
                                 e['type'] == 'missing' and e['loc'] == ('response',)
