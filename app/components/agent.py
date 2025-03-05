@@ -1,34 +1,22 @@
-from __future__ import annotations as _annotations  # Should be first import
+from __future__ import annotations as _annotations
 
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import List
 import json
 import os
-import lancedb
 import re
-
 import uuid
-from lancedb.pydantic import LanceModel, Vector
-from lancedb.embeddings import get_registry
-
 import asyncio
-from duckduckgo_search import DDGS
-from openai import OpenAI
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.messages import ToolCallPart, ToolReturnPart
-from pydantic_ai.models.gemini import GeminiModel
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.messages import ToolReturnPart
 from components.system_prompts import get_chatbot_prompt
-
 from models.models import *
 from agents.LLMs import get_model
-
+from components.DatabaseManager import DatabaseManager
 
 import logging
-
-from components.DatabaseManager import DatabaseManager
 
 
 
