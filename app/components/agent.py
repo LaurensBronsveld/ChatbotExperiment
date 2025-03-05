@@ -50,7 +50,7 @@ class Assistant_Agent():
 
     def search_database(self, ctx: RunContext, query: str):
             try:
-                results = self.table.search(query, vector_column_name='vector').limit(5).to_pydantic(HandbookChunk)
+                results = self.hand_book_table.search(query, vector_column_name='vector').limit(5).to_pydantic(HandbookChunk)
                 json_results = []
                 id = 1
 
@@ -67,30 +67,61 @@ class Assistant_Agent():
                 return{"error": str(e)}
     
 
-    def __init__(self, db: DatabaseManager, model_provider, model_name: str):
+    def __init__(self, db: DatabaseManager, model_provider, model_name: str, language: str):
         
         self.model = get_model(model_provider, model_name)
         
-        self.agent = Agent(self.model, result_type=ResponseDict, system_prompt= get_chatbot_prompt())    
+        self.agent = Agent(self.model, result_type=ResponseDict, system_prompt= get_chatbot_prompt(language))    
    
         self.history = []
         self.dbmanager = db
-        self._table = None
+        self._handbook_table = None
+        self._history_table = None
 
         self.agent.tool(self.search_database)
-        # self.agent.tool(self.ddg_search)
+        
         
     @property
-    def table(self):
-        if self._table is None:
+    def hand_book_table(self):
+        if self._handbook_table is None:
             try:
-                self._table = self.dbmanager.get_table("embedded_handbook_with_urls")
+                self._handbook_table = self.dbmanager.get_table("embedded_handbook_with_urls")
             except Exception as e:
                 print(f"error accesssing table: {str(e)}")
                 raise
-        return self._table
+        return self._handbook_table
     
-  
+    @property
+    def history_table(self):
+        if self._history_table is None:
+            try:
+                self._history_table = self.dbmanager.get_table("history_table")
+            except Exception as e:
+                print(f"error accesssing table: {str(e)}")
+                raise
+        return self._history_table
+    
+    def get_chat_history(self, session_id: str):
+        results = self.history_table.search().where(f"session_id = '{session_id}'").limit(1).to_pydantic(ChatHistory)
+        if results:
+            return results[0].history
+        else:
+            return None
+    
+    def update_chat_history(self, session_id: str, share_token: str, new_history: str):
+        logging.debug('test')
+        results = self.history_table.search().where(f"session_id = '{session_id}'").limit(1).to_pydantic(ChatHistory)
+        if results:
+            logging.debug("test2")
+            self.history_table.update(where=f"session_id = '{session_id}'", values={'history': new_history})
+        else:
+            logging.debug('test3')
+            data = [ChatHistory(session_id=session_id, share_token=share_token, history=new_history)]
+            self.history_table.add(data)
+            logging.debug(data)
+            #self.dbmanager.update_table(table_name="history_table", session_id=session_id, share_token=share_token, new_history=new_history)
+        
+
     def get_tool_results(self, result, tool_name):
         content = []
         sources = []
@@ -121,7 +152,8 @@ class Assistant_Agent():
    
 
     async def generate_response_stream(self, request: RequestModel):
-        self.history.append({'role': "user", "content": request.user['question']})
+        history = []
+        # self.history.append({'role': "user", "content": request.user['question']})
 
         complete_content = ""  # Store the response text as it is streamed
         new_content = ""
@@ -129,9 +161,17 @@ class Assistant_Agent():
         # if session_id is null, generate one
         if not request.metadata['session_id']:
             request.metadata['session_id'] = str(uuid.uuid4())
-    
+            request.metadata['share_token'] = str(uuid.uuid4())
+        else:
+            # if session_id is there, load chat history 
+            history = json.loads(self.get_chat_history(request.metadata['session_id']))
+
+        # add user question to history
+        history.append({'role': "user", "content": request.user['question']})
+        logging.debug(history)
+        # get streaming response from agent
         try:
-            async with self.agent.run_stream(str(self.history)) as result:
+            async with self.agent.run_stream(str(history)) as result:
                 
                 sources = self.get_tool_results(result, 'search_database')
                 
@@ -146,6 +186,7 @@ class Assistant_Agent():
                             content = chunk.get('content')
                             new_content = content[len(complete_content):]
                             complete_content = content
+
                         # determine used sources
                         cite_regex = r"\[@(\d+)\]"   #regex which matches citations in this format [@X], with X being any number
                         citations = re.findall(cite_regex, complete_content)
@@ -154,6 +195,7 @@ class Assistant_Agent():
                             if str(source.get('id')) in citations:
                                 source['used'] = True
 
+                        # create response object
                         response = ResponseDict(
                             content=new_content, 
                             sources=sources,
@@ -178,9 +220,11 @@ class Assistant_Agent():
                    
                 
                 
-                logging.debug(json.dumps(response).encode('utf-8') + b'\n')
-                logging.debug(complete_content)
-                self.history.append({'role': "assistant", "content": complete_content})
+                # logging.debug(json.dumps(response).encode('utf-8') + b'\n')
+                # logging.debug(complete_content)
+                history.append({'role': "assistant", "content": complete_content})
+                logging.debug("pretest")
+                self.update_chat_history(request.metadata['session_id'], "test", "test")
                 
 
         except Exception as e:

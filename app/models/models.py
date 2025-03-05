@@ -23,7 +23,7 @@ class Tool(BaseModel):
 
 class metadata(BaseModel):
     language: str = Field(description = "Language in which the user's question is written and in which the Assistant should respond")
-    session_id: Optional[UUID] = Field(description = "session id which can be used to retrieve conversation history later. Should be generated at the start of each new conversation")
+    session_id: Optional[str] = Field(description = "session id which can be used to retrieve conversation history later. Should be generated at the start of each new conversation")
     tools: List[Tool] = Field(description = "List of tools the LLM agent can use.")
 
 
@@ -57,7 +57,7 @@ class ResponseDict(TypedDict, total = False):
     tools_used: List[str] = Field(description="List of tools that were used to generate the response.")
     able_to_answer: bool = Field(description="Indicates whether the LLM was able to generate a confident answer.")
     question_classification: str = Field(description="The category or classification of the question.")
-    session_id: UUID = Field(description="The session ID associated with the interaction.")
+    session_id: str = Field(description="The session ID associated with the interaction.")
     trace_id: UUID = Field(description="The trace ID for debugging or monitoring purposes.")
     share_token: str = Field(description="A token that can be used to share or retrieve the response.")
     follow_up_questions: List[str] = Field(description="Suggested follow-up questions for the user.")
@@ -69,3 +69,8 @@ class HandbookChunk(LanceModel):
     chunk_id: str 
     source_url: str 
     chunk: str
+
+class ChatHistory(LanceModel):
+    session_id: str
+    share_token: str
+    history: str

@@ -1,6 +1,7 @@
 from typing import Optional
 import lancedb
 import pandas as pd
+from models.models import *
 
 class DatabaseManager:
     _instance: Optional['DatabaseManager'] = None #makes class singleton
@@ -31,4 +32,10 @@ class DatabaseManager:
         
     def get_tables(self):
         return self.db.table_names()
+    
+    def update_table(self, table_name: str, session_id: str, share_token: str, new_history: str):
+        table = self.db.open_table(table_name)
+        data = [ChatHistory(session_id=session_id, share_token=share_token, history=new_history)]
+        table.add(data)
+
         

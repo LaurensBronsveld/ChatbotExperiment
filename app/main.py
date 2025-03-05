@@ -1,5 +1,5 @@
 from typing import Union
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -20,11 +20,13 @@ DATABASE_LOCATION = "./data/lancedb"
 
 app = FastAPI()
 db_manager = DatabaseManager(DATABASE_LOCATION)
-assistant = Assistant_Agent(db_manager, MODEL_PROVIDER, MODEL_NAME)
 
+def get_assistant(request: RequestModel):
+    language = request.metadata['language']
+    return Assistant_Agent(db_manager, MODEL_PROVIDER, MODEL_NAME, language)
 
 @app.post("/assistant/")
-async def get_response(request: RequestModel):
+async def get_response(request: RequestModel, assistant: Assistant_Agent = Depends(get_assistant)):
     """
     Generate a response from the assistant agent.
     Returns a streaming response with the chatbot response and other metadata defined in the responsedict class.
