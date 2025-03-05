@@ -1,2 +1,30 @@
 # ignore all files in the data folder
 /data/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore virtual environments
+venv/
+.env/
+.venv/
+
+# Ignore IDE/editor specific files
+.vscode/
+.idea/
+*.sublime-workspace
+
+# Ignore build and distribution files
+build/
+dist/
+*.egg-info/
+
+# Ignore logs and temporary files
+*.log
+.DS_Store
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
