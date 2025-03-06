@@ -34,10 +34,12 @@ logging.getLogger("pydantic_ai").setLevel(logging.WARNING)
 
 
 langfuse = Langfuse(
-    public_key = settings.LANGFUSE_PUBLIC_KEY,
-    secret_key = settings.LANGFUSE_SECRET_KEY,
-    host = settings.LANGFUSE_HOST
-)
+            public_key = settings.LANGFUSE_PUBLIC_KEY,
+            secret_key = settings.LANGFUSE_SECRET_KEY,
+            host = settings.LANGFUSE_HOST
+        )
+
+
 
 class Assistant_Agent():
 
@@ -73,6 +75,8 @@ class Assistant_Agent():
         self._history_table = None
 
         self.agent.tool(self.search_database)
+
+        
         
         
     @property
@@ -140,9 +144,9 @@ class Assistant_Agent():
 
     @observe(capture_input=True, capture_output=True, as_type="generation", name="chatbot response")
     async def process_answer(self, history: str, session_id: str, share_token: str, retries: int = 3):
+
             complete_content = ""
             new_content = ""
-
             
             trace_id = langfuse_context.get_current_trace_id()
             logging.debug(langfuse_context.get_current_trace_url())
@@ -208,6 +212,7 @@ class Assistant_Agent():
         history = []
         session_id = ""
         share_token = ""
+
 
         # start langfuse trace
         trace = langfuse.trace(

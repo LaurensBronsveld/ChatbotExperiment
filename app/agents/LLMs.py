@@ -13,3 +13,4 @@ def get_model():
         return GeminiModel(settings.LLM_MODEL, api_key=os.environ.get("GEMINI_API_KEY"))
     elif settings.LLM_PROVIDER.lower() == "anthropic":
         return AnthropicModel(settings.LLM_MODEL, api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    
