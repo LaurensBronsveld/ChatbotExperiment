@@ -58,7 +58,7 @@ class ResponseDict(TypedDict, total = False):
     able_to_answer: bool = Field(description="Indicates whether the LLM was able to generate a confident answer.")
     question_classification: str = Field(description="The category or classification of the question.")
     session_id: str = Field(description="The session ID associated with the interaction.")
-    trace_id: UUID = Field(description="The trace ID for debugging or monitoring purposes.")
+    trace_id: str = Field(description="The trace ID for debugging or monitoring purposes.")
     share_token: str = Field(description="A token that can be used to share or retrieve the response.")
     follow_up_questions: List[str] = Field(description="Suggested follow-up questions for the user.")
 

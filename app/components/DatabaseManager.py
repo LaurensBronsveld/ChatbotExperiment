@@ -3,7 +3,7 @@ import lancedb
 import pandas as pd
 from models.models import *
 import logging
-
+from config import settings
 
 
 # Set up logging configuration
@@ -21,9 +21,9 @@ logging.getLogger("pydantic_ai").setLevel(logging.WARNING)
 class DatabaseManager:
     _instance: Optional['DatabaseManager'] = None #makes class singleton
 
-    def __init__(self, uri: str):
-        self.uri = uri
-        self.db = lancedb.connect(uri)
+    def __init__(self):
+        self.uri = settings.DATABASE_LOCATION
+        self.db = lancedb.connect(self.uri)
     
     #creates instance of databasemanager or returns if one already exists.
     @classmethod

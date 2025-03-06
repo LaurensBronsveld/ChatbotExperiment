@@ -8,16 +8,15 @@ from components.DatabaseManager import DatabaseManager
 from models.models import RequestModel
 
 # setup
-MODEL_PROVIDER = "open-ai"
-MODEL_NAME = "gpt-4o"
+
 DATABASE_LOCATION = "./data/lancedb"
 
 app = FastAPI()
-db_manager = DatabaseManager(DATABASE_LOCATION)
+db_manager = DatabaseManager()
 
 def get_assistant(request: RequestModel):
     language = request.metadata['language']
-    return Assistant_Agent(db_manager, MODEL_PROVIDER, MODEL_NAME, language)
+    return Assistant_Agent(db_manager, language)
 
 @app.post("/assistant/")
 async def get_response(request: RequestModel, assistant: Assistant_Agent = Depends(get_assistant)):
