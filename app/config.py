@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str 
     LANGFUSE_PUBLIC_KEY: str
     LANGFUSE_SECRET_KEY: str
+    COHERE_API_KEY: str
     # DATABASE_URL: str           # not used yet
     DATABASE_LOCATION: str = "./data/lancedb"
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"

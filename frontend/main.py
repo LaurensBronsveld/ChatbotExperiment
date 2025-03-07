@@ -88,24 +88,40 @@ def main():
         try:
             response_stream = get_streaming_resonse(prompt, st.session_state.session_id)
             sources = []
+            metadata_received = False
+
             if response_stream:
                 with st.chat_message('assistant'):
                     message_placeholder = st.empty()
                     full_response = ""
                     data = ""
+                    last_displayed = ""
+
                     #process streaming response
                     for chunk in response_stream.iter_content(chunk_size=None, decode_unicode=True):
                         data = json.loads(chunk)
+                        print(data)
+                        # first chunk is metadata
+                        if not metadata_received:
+                            sources = data['sources']
+                            st.session_state.session_id = data['session_id']
+                            metadata_received = True  
+                            continue       
+                        
                         if data['content']:
-                                response = data['content']
+                            response = data['content']
                 
-                                full_response+=response #add chunk to response
-                                message_placeholder.markdown(full_response) #display updated response
-                   
-                    sources = data['sources']
-                    questions = data['follow_up_questions']
-                    st.session_state.session_id = data['session_id']       
+                             # Extract only new content
+                            new_data = response[len(last_displayed):]  
+                            last_displayed = response  # Update tracking
 
+                            if new_data:  # Only update UI if there's actually new text
+                                full_response += new_data
+                                message_placeholder.markdown(full_response)
+                   
+                    
+                    questions = data['follow_up_questions']
+                       
                     st.session_state.messages.append({"role": 'assistant', 'content': full_response})
                 
                 with st.sidebar:
