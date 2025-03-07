@@ -103,6 +103,7 @@ def main():
                                 message_placeholder.markdown(full_response) #display updated response
                    
                     sources = data['sources']
+                    questions = data['follow_up_questions']
                     st.session_state.session_id = data['session_id']       
 
                     st.session_state.messages.append({"role": 'assistant', 'content': full_response})
@@ -110,6 +111,11 @@ def main():
                 with st.sidebar:
                     for source in sources:
                         st.write(source)
+                
+                with st.container():
+                    for question in questions:
+                        st.write(question)
+
                 
         except Exception as e:
             print(f"something went wrong with the response. Error: {e}")
