@@ -213,7 +213,7 @@ class Assistant_Agent():
         session_id = ""
         share_token = ""
 
-
+        logging.debug(f"start {session_id}")
         # start langfuse trace
         trace = langfuse.trace(
             name = "chat_request"
@@ -222,14 +222,16 @@ class Assistant_Agent():
         # if session_id is null, generate one
         if not request.metadata['session_id']:
             logging.debug("test")
-            request.metadata['session_id'] = str(uuid.uuid4())
+            session_id = str(uuid.uuid4())
             share_token = str(uuid.uuid4())
         else:
             # if session_id exists, retrieve chat history
             history, share_token = self.get_chat_history(request.metadata['session_id'])
             session_id = request.metadata['session_id']
             history = json.loads(history)
-            
+        
+        logging.debug(session_id)
+        logging.debug(history)
         # add user question to history
         history.append({'role': "user", "content": request.user['question']})
         
