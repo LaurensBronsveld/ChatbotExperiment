@@ -42,7 +42,7 @@ langfuse = Langfuse(
 
 
 class Assistant_Agent():
-
+    interrupts = {}                     #dictionary to track if an interupt event has been called
 
     def search_database(self, ctx: RunContext, query: str):
             try:
@@ -73,12 +73,9 @@ class Assistant_Agent():
         self.dbmanager = db
         self._handbook_table = None
         self._history_table = None
-
+        
         self.agent.tool(self.search_database)
-
-        
-        
-        
+    
     @property
     def hand_book_table(self):
         if self._handbook_table is None:
@@ -99,6 +96,15 @@ class Assistant_Agent():
                 raise
         return self._history_table
     
+    # def interrupt(self, session_id: str):
+    #     if session_id in self.interrupts:
+    #         Assistant_Agent.interrupts[session_id].set()
+    #     else:
+    #         logging.error(f"no active session found with session_id: {session_id}")
+    
+    def is_interrupted(self, session_id: str):
+        return Assistant_Agent.interrupts[session_id].is_set()
+
     def get_chat_history(self, session_id: str):
         try:
             results = self.history_table.search().where(f"session_id = '{session_id}'").limit(1).to_pydantic(ChatHistory)
@@ -144,63 +150,71 @@ class Assistant_Agent():
 
     @observe(capture_input=True, capture_output=True, as_type="generation", name="chatbot response")
     async def process_answer(self, history: str, session_id: str, share_token: str, retries: int = 3):
-
+            count = 0
             complete_content = ""
             new_content = ""
             
             trace_id = langfuse_context.get_current_trace_id()
             logging.debug(langfuse_context.get_current_trace_url())
             
-          
-            async with self.agent.run_stream(str(history)) as result:
-                        
-                sources = self.get_tool_results(result, 'search_database')
-                            
-                async for structured_result, last in result.stream_structured(debounce_by=0.01):            
-                    try:
-                        chunk = await result.validate_structured_result(
-                        structured_result, allow_partial=not last
-                        )                        
-                                    
-                        #determine new content
-                        if chunk.get('content'):
-                            content = chunk.get('content')
-                            new_content = content[len(complete_content):]
-                            complete_content = content
+            try: 
+                async with self.agent.run_stream(str(history)) as result:     
+                    sources = self.get_tool_results(result, 'search_database')
+                    stream = result.stream_structured(debounce_by=0.01)
+                    async for structured_result, last in stream:            
+                            # count += 1
+                            # if count == 10:
+                            #     self.interrupt(session_id)
+                            if self.is_interrupted(session_id):
+                                logging.debug(f'session {session_id} interrupted. Ending response now.')
+                                await stream.aclose()
+                                return
+                            try:
+                                chunk = await result.validate_structured_result(
+                                structured_result, allow_partial=not last
+                                )                        
+                                            
+                                #determine new content
+                                if chunk.get('content'):
+                                    content = chunk.get('content')
+                                    new_content = content[len(complete_content):]
+                                    complete_content = content
 
-                        # determine used sources
-                        cite_regex = r"\[@(\d+)\]"   #regex which matches citations in this format [@X], with X being any number
-                        citations = re.findall(cite_regex, complete_content)
-                                
-                        for source in sources:
-                            if str(source.get('id')) in citations:
-                                source['used'] = True
+                                # determine used sources
+                                cite_regex = r"\[@(\d+)\]"   #regex which matches citations in this format [@X], with X being any number
+                                citations = re.findall(cite_regex, complete_content)
+                                        
+                                for source in sources:
+                                    if str(source.get('id')) in citations:
+                                        source['used'] = True
 
-                        # create response object
-                        response = ResponseDict(
-                            content=new_content, 
-                            sources=sources,
-                            tools_used = chunk.get("tools_used"),
-                            able_to_answer=chunk.get("able_to_answer"),
-                            question_classification= chunk.get('question_classification'),
-                            session_id=session_id,
-                            trace_id= trace_id,
-                            share_token=share_token,
-                            follow_up_questions=chunk.get('follow_up_questions'))
-                                    
-                        yield(json.dumps(response).encode('utf-8') + b'\n')
+                                # create response object
+                                response = ResponseDict(
+                                    content=new_content, 
+                                    sources=sources,
+                                    tools_used = chunk.get("tools_used"),
+                                    able_to_answer=chunk.get("able_to_answer"),
+                                    question_classification= chunk.get('question_classification'),
+                                    session_id=session_id,
+                                    trace_id= trace_id,
+                                    share_token=share_token,
+                                    follow_up_questions=chunk.get('follow_up_questions'))
+                                            
+                                yield(json.dumps(response).encode('utf-8') + b'\n')
+                            except ValidationError as exc:
+                                if all(
+                                    e['type'] == 'missing' and e['loc'] == ('response',)
+                                            for e in exc.errors()
+                                    ):
+                                    continue
+                                else:
+                                    raise
 
-                    except httpx.ReadError as e:
-                        logging.error(f"Streaming interrupted: {e}")
-                        break  # Stop streaming if connection is lost
-                    except ValidationError as exc:
-                        if all(
-                            e['type'] == 'missing' and e['loc'] == ('response',)
-                                        for e in exc.errors()
-                            ):
-                            continue
-                        else:
-                            raise
+            except Exception as e:
+                logging.error(f'another error: {e}')
+                return
+               # Stop streaming if connection is lost
+                   
                     
 
             history.append({'role': "assistant", "content": complete_content})
@@ -229,22 +243,27 @@ class Assistant_Agent():
             history, share_token = self.get_chat_history(request.metadata['session_id'])
             session_id = request.metadata['session_id']
             history = json.loads(history)
-            
+        
         # add user question to history
         history.append({'role': "user", "content": request.user['question']})
         
+        # add session to list to check if it gets interrupted
+        Assistant_Agent.interrupts[session_id] = asyncio.Event()   
+
         # get streaming response from agent
-        retries = 3
-        for attempt in range(retries):
-            try:       
-                async for chunk in self.process_answer(history, session_id, share_token):
-                    yield chunk
-                break
-            except Exception as e:
-                if attempt < retries-1:
-                    continue
-                else:
-                    logging.error('something went wrong generating the response')
+        # retries = 3
+        # for attempt in range(retries):
+        try:       
+            async for chunk in self.process_answer(history, session_id, share_token):
+                yield chunk
+        
+        except Exception as e:
+            # if attempt < retries-1:
+            #     continue
+            # else:
+            logging.error('something went wrong generating the response')
+        
+        Assistant_Agent.interrupts.pop(session_id)
         
 
             

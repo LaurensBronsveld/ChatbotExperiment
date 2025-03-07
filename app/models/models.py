@@ -35,6 +35,9 @@ class RequestModel(BaseModel):
     metadata: object
     user: object
 
+class StopModel(BaseModel):
+    session_id: str
+
 # models for chat response
 class SourceDict(TypedDict):
     id: Required[int]

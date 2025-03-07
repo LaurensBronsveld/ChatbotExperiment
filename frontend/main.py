@@ -59,6 +59,13 @@ def get_streaming_resonse(query: str, session_id: str):
     except Exception as e:
         print({"error": e})
 
+def interrupt_response(session_id: str):
+    print(session_id)
+    response = requests.post(
+        f"{API_URL}/assistant/stop/",
+        json={"session_id": session_id},
+    )
+
 def main():
     st.title("chatbot experiment")
 
@@ -75,6 +82,10 @@ def main():
         with st.chat_message(message['role']):
             st.markdown(message['content'])
 
+    
+    if st.button("stop response"):
+        interrupt_response(st.session_state.session_id)
+
     # Handle new messages
     if prompt := st.chat_input("ask a question"):
 
@@ -83,6 +94,7 @@ def main():
             st.markdown(prompt)
 
         st.session_state.messages.append({"role": 'user', 'content': prompt})
+        
 
         # Display assistant response
         try:
