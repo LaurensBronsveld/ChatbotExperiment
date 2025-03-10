@@ -1,3 +1,45 @@
+languages = {
+    'ar': 'Arabic',
+    'bg': 'Bulgarian',
+    'ca': 'Catalan',
+    'zh': 'Chinese',
+    'hr': 'Croatian',
+    'cs': 'Czech',
+    'da': 'Danish',
+    'nl': 'Dutch',
+    'en': 'English',
+    'et': 'Estonian',
+    'fi': 'Finnish',
+    'fr': 'French',
+    'de': 'German',
+    'el': 'Greek',
+    'he': 'Hebrew',
+    'hi': 'Hindi',
+    'hu': 'Hungarian',
+    'id': 'Indonesian',
+    'it': 'Italian',
+    'ja': 'Japanese',
+    'ko': 'Korean',
+    'lv': 'Latvian',
+    'lt': 'Lithuanian',
+    'ms': 'Malay',
+    'no': 'Norwegian',
+    'pl': 'Polish',
+    'pt': 'Portuguese',
+    'ro': 'Romanian',
+    'ru': 'Russian',
+    'sr': 'Serbian',
+    'sk': 'Slovak',
+    'sl': 'Slovenian',
+    'es': 'Spanish',
+    'sv': 'Swedish',
+    'th': 'Thai',
+    'tr': 'Turkish',
+    'uk': 'Ukrainian',
+    'vi': 'Vietnamese'
+}
+
+
 def get_chatbot_prompt(language: str):
     prompt = f"""You are a helpful assistant who provides answers to questsions related to the Gitlab Handbook. 
                         You have access to an embedded database containing the whole Gitlab Handbook
@@ -16,7 +58,7 @@ def get_chatbot_prompt(language: str):
                         The content part in your output should only contain your answer to the question, keep all other metadata and sources out of it.
                         Try to determine what the question classification is, for example technical, HR or general information etc
                         Suggest a few follow up questions the user might have after your response.
-                        Always answer the question in {language}.
+                        If its unclear in what language you should answer, answer the question in {languages[language]}.
                         """
     
     return prompt
