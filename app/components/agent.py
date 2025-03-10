@@ -8,7 +8,6 @@ import os
 import httpx
 import re
 import uuid
-import asyncio
 from pydantic import ValidationError
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ToolReturnPart, ToolCallPart
@@ -19,7 +18,6 @@ from components.DatabaseManager import DatabaseManager
 from config import settings
 from langfuse import Langfuse
 from langfuse.decorators import observe, langfuse_context
-from dotenv import load_dotenv
 import logging
 
 # Set up logging configuration
@@ -41,43 +39,56 @@ langfuse = Langfuse(
 
 
 
-class Assistant_Agent():
+class Assistant():
 
-
-    def search_database(self, ctx: RunContext, query: str):
-            try:
-                results = self.hand_book_table.search(query, vector_column_name='vector').limit(5).to_pydantic(HandbookChunk)
-                json_results = []
-                id = 1
-
-                for chunk in results:
-                    chunk_dict = {
-                        "id": id,
-                        "source_url": chunk.source_url,
-                        "chunk": chunk.chunk
-                    }
-                    json_results.append(chunk_dict)
-                    id += 1
-                return json_results
-            except Exception as e:
-                return{"error": str(e)}
+    
     
 
     def __init__(self, db: DatabaseManager, language: str):
         
-        self.model = get_model()
-        
+        self.model = get_model()        
         self.agent = Agent(self.model, result_type=ResponseDict, system_prompt= get_chatbot_prompt(language))    
-   
-        self.history = []
+
         self.dbmanager = db
         self._handbook_table = None
         self._history_table = None
 
         self.agent.tool(self.search_database)
+    
+    def search_database(self, ctx: RunContext, query: str, tool_call_attempt: int, limit: int = 3):
+        """
+        Searches the handbook database using the provided query for relevant chunks of information.
+        
+        This method performs a vector search on the LanceDB database containing embedded chunks of the Gitlab Handbook.
+        It returns the top X matching results from the database in the form of a JSON list of dictionaries with ID, source and content
+        Args:
+            ctx (RunContext): The context of the current run, providing access to dependencies and state.
+            query (str): The search query to use against the handbook database.
+            tool_call_attempt (int): The attempt number of the tool call, used to generate unique IDs for results. First attempt is 0.
 
+        Returns:
+            list[dict] or dict: A list of dictionaries, where each dictionary represents a search result
+                            containing the 'id', 'source_url', and 'chunk'. 
+        """ 
+        #setup
+        json_results = []
+        id = tool_call_attempt * limit # set starting id based on how many times tool has been called before
+        try:
+            # perform vector search on database
+            results = self.hand_book_table.search(query, vector_column_name='vector').limit(limit).to_pydantic(HandbookChunk)
         
-        
+            # create dictionaries
+            for chunk in results:
+                id += 1
+                chunk_dict = {
+                    "id": id,
+                    "source_url": chunk.source_url,
+                    "chunk": chunk.chunk
+                }
+                json_results.append(chunk_dict)     
+            return json_results
+        except Exception as e:
+            return{"error": str(e)}
         
     @property
     def hand_book_table(self):
@@ -102,6 +113,7 @@ class Assistant_Agent():
     def get_chat_history(self, session_id: str):
         try:
             results = self.history_table.search().where(f"session_id = '{session_id}'").limit(1).to_pydantic(ChatHistory)
+            logging.debug(results)
             if results:
                 return results[0].history, results[0].share_token
             else:
@@ -115,19 +127,20 @@ class Assistant_Agent():
         except Exception as e:
             logging.error(f"something went wrong updating history : {e}")
        
-    def get_tool_results(self, result, tool_name):
+    def get_tool_results(self, result: object, tool_name: str, history: List):
         content = []
         sources = []
         tools = []
         
+
         # get resuls from tool call out of Result object
         for message in result.all_messages():
                     for part in message.parts:
                         if isinstance(part, ToolReturnPart) and part.tool_name == tool_name:
                             content.extend(part.content)
-                        elif isinstance(part, ToolCallPart):
                             tools.append(part.tool_name)
-                            #sources.append(f"{part.content['id']}. {part.content['source_url']}")
+                            system_call = {'role': "System", "content": f"Called tool: {tool_name}. Results: {part.content}"}
+                            history.append(system_call)
 
         # create source objects 
         for source in content: 
@@ -154,8 +167,10 @@ class Assistant_Agent():
             
           
             async with self.agent.run_stream(str(history)) as result:
-                        
-                sources, tools_used = self.get_tool_results(result, 'search_database')
+
+                sources, tools_used = self.get_tool_results(result, 'search_database', history)
+                logging.debug(result)
+                
                 metadata = ResponseMetadata(
                     sources = sources,
                     tools_used = tools_used,
@@ -163,7 +178,6 @@ class Assistant_Agent():
                     trace_id = trace_id,
                     share_token = share_token) 
                 yield(json.dumps(metadata).encode('utf-8') + b'\n')      
-                logging.debug(json.dumps(metadata).encode('utf-8') + b'\n')
                        
                 async for structured_result, last in result.stream_structured(debounce_by=0.01): 
                         
@@ -171,12 +185,7 @@ class Assistant_Agent():
                         chunk = await result.validate_structured_result(
                         structured_result, allow_partial=not last
                         )                        
-                                    
-                        # #determine new content. This should happen in front end
-                        # if chunk.get('content'):
-                        #     content = chunk.get('content')
-                        #     new_content = content[len(complete_content):]
-                        #     complete_content = content
+                        
                         content = chunk.get('content')
                         if not last:
                             if content != old_content:
@@ -187,29 +196,14 @@ class Assistant_Agent():
                                     )    
                                 yield(json.dumps(response).encode('utf-8') + b'\n')   
                         else: 
-                            # # determine used sources
-                            # cite_regex = r"\[@(\d+)\]"   #regex which matches citations in this format [@X], with X being any number
-                            # citations = re.findall(cite_regex, content)
-                                    
-                            # for source in sources:
-                            #     if str(source.get('id')) in citations:
-                            #         source['used'] = True
                             
                             # create response object
                             response = ResponseDict(
                                 content=content, 
-                                sources=sources,
-                                tools_used = chunk.get("tools_used"),
                                 able_to_answer=chunk.get("able_to_answer"),
                                 question_classification= chunk.get('question_classification'),
-                                session_id=session_id,
-                                trace_id= trace_id,
-                                share_token=share_token,
                                 follow_up_questions=chunk.get('follow_up_questions'))
                             yield(json.dumps(response).encode('utf-8') + b'\n')
-                        
-                        # send response to front end
-                        
 
                     except httpx.ReadError as e:
                         logging.error(f"Streaming interrupted: {e}")
@@ -223,11 +217,9 @@ class Assistant_Agent():
                         else:
                             raise
                     
-
-            history.append({'role': "assistant", "content": content})
+            history.append({'role': "Assistant", "content": content})
             self.update_chat_history(session_id, share_token, json.dumps(history))
 
-                
     async def generate_response_stream(self, request: RequestModel):
         # define variables
         history = []
@@ -242,7 +234,6 @@ class Assistant_Agent():
 
         # if session_id is null, generate one
         if not request.metadata['session_id']:
-            logging.debug("test")
             request.metadata['session_id'] = str(uuid.uuid4())
             share_token = str(uuid.uuid4())
         else:
@@ -252,7 +243,7 @@ class Assistant_Agent():
             history = json.loads(history)
             
         # add user question to history
-        history.append({'role': "user", "content": request.user['question']})
+        history.append({'role': "User", "content": request.user['question']})
         
         # get streaming response from agent
         retries = 3
@@ -271,82 +262,46 @@ class Assistant_Agent():
                 else:
                     logging.error('something went wrong generating the response')
         
+    def generate_response(self, request: RequestModel):
+        
+        # if session_id is null, generate one
+        if not request.metadata['session_id']:
+            request.metadata['session_id'] = str(uuid.uuid4())
+            share_token = str(uuid.uuid4())
+        else:
+            # if session_id exists, retrieve chat history
+            history, share_token = self.get_chat_history(request.metadata['session_id'])
+            session_id = request.metadata['session_id']
+            history = json.loads(history)
+        
+        # add user question to history
+        history.append({'role': "User", "content": request.user['question']})
 
-            
-        # async def process_answer(retries: int = 3):
-        #     for attempt in range(retries):
-        #         try:
-        #             async with self.agent.run_stream(str(history)) as result:
-                        
-        #                 sources = self.get_tool_results(result, 'search_database')
-                        
-        #                 async for structured_result, last in result.stream_structured(debounce_by=0.01):            
-        #                     try:
-        #                         chunk = await result.validate_structured_result(
-        #                             structured_result, allow_partial=not last
-        #                         )
-                                
-        #                         #determine new content
-        #                         if chunk.get('content'):
-        #                             content = chunk.get('content')
-        #                             new_content = content[len(complete_content):]
-        #                             complete_content = content
+        response = self.agent.run_sync(history)
+        history.append({'role': "Assistant", "content": response.content})
+        return response
+ 
 
-        #                         # determine used sources
-        #                         cite_regex = r"\[@(\d+)\]"   #regex which matches citations in this format [@X], with X being any number
-        #                         citations = re.findall(cite_regex, complete_content)
-                            
-        #                         for source in sources:
-        #                             if str(source.get('id')) in citations:
-        #                                 source['used'] = True
+# db_manager = DatabaseManager()
+# assistant = Assistant(db_manager, 'nl')
 
-        #                         # create response object
-        #                         response = ResponseDict(
-        #                             content=new_content, 
-        #                             sources=sources,
-        #                             tools_used = chunk.get("tools_used"),
-        #                             able_to_answer=chunk.get("able_to_answer"),
-        #                             question_classification= chunk.get('question_classification'),
-        #                             session_id=request.metadata['session_id'],
-        #                             trace_id= None,
-        #                             share_token=share_token,
-        #                             follow_up_questions=chunk.get('follow_up_questions'))
-                                
-        #                         yield(json.dumps(response).encode('utf-8') + b'\n')
-
-        #                     except httpx.ReadError as e:
-        #                         logging.error(f"Streaming interrupted: {e}")
-        #                         break  # Stop streaming if connection is lost
-        #                     except ValidationError as exc:
-        #                         if all(
-        #                             e['type'] == 'missing' and e['loc'] == ('response',)
-        #                             for e in exc.errors()
-        #                         ):
-        #                             continue
-        #                         else:
-        #                             raise
-                    
-
-        #             history.append({'role': "assistant", "content": complete_content})
-        #             self.update_chat_history(request.metadata['session_id'], share_token, json.dumps(history))
-        #             return
-        #         except Exception as e:
-        #             if attempt < retries - 1:
-        #                 await asyncio.sleep(2)
-        #             else:       
-        #                 logging.error(f"something went wrong with streaming the response: {e}")
-# db_manager = DatabaseManager("./data/lancedb")
-# assistant = Assistant_Agent(db_manager)
-
-# async def main():
-    
-#     response = await assistant.generate_response("What is GitLab's approach to paid time off (PTO)", True, False)
+# def main():
+#     request = {"metadata": {"language": "nl",
+#                         "session_id": "",
+#                         "tools": [{ "name": "HR", "enabled": True }]
+#                     }, 
+#                     "user": {
+#                         "question": "What is GitLab's approach to paid time off (PTO)",
+#                         "context": [
+#                             { "type": "file", "URL": "" }, 
+#                             { "type": "snippet", "text": ""},
+#                             { "type": "url", "url": "https://example.com" }
+#                         ]
+#                     }
+#                     }
+#     response = assistant.generate_response(request)
 #     print(response)
 
-#       # Wait for all pending tasks to complete (IMPORTANT!)
-#     pending = asyncio.all_tasks()
-#     while pending:  # Check if there are any pending tasks.
-#         await asyncio.gather(*pending) # * unpacks the set of tasks.
 
 # if __name__ == "__main__":
-#     asyncio.run(main())
+#     main()
