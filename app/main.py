@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.responses import StreamingResponse
 import uvicorn
 
-from components.agent import Assistant_Agent
+from components.agent import Assistant
 from components.DatabaseManager import DatabaseManager
 from models.models import RequestModel
 
@@ -16,10 +16,10 @@ db_manager = DatabaseManager()
 
 def get_assistant(request: RequestModel):
     language = request.metadata['language']
-    return Assistant_Agent(db_manager, language)
+    return Assistant(db_manager, language)
 
 @app.post("/assistant/")
-async def get_response(request: RequestModel, assistant: Assistant_Agent = Depends(get_assistant)):
+async def get_response(request: RequestModel, assistant: Assistant = Depends(get_assistant)):
     """
     Generate a response from the assistant agent.
     Returns a streaming response with the chatbot response and other metadata defined in the responsedict class.
