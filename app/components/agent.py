@@ -41,9 +41,6 @@ langfuse = Langfuse(
 
 class Assistant():
 
-    
-    
-
     def __init__(self, db: DatabaseManager, language: str):
         
         self.model = get_model()        
