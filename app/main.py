@@ -6,11 +6,12 @@ import uvicorn
 from components.agent import Assistant
 from components.DatabaseManager import DatabaseManager
 from models.models import RequestModel
+import sys
+import os
+
 
 # setup
-
 DATABASE_LOCATION = "./data/lancedb"
-
 app = FastAPI()
 db_manager = DatabaseManager()
 
@@ -24,7 +25,7 @@ async def get_response(request: RequestModel, assistant: Assistant = Depends(get
     Generate a response from the assistant agent.
     Returns a streaming response with the chatbot response and other metadata defined in the responsedict class.
     """
-
+    
     response_stream = assistant.generate_response_stream(
         request = request
 

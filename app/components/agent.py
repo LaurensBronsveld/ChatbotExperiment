@@ -18,7 +18,10 @@ from components.DatabaseManager import DatabaseManager
 from config import settings
 from langfuse import Langfuse
 from langfuse.decorators import observe, langfuse_context
+import cohere
+from lancedb.rerankers import CohereReranker
 import logging
+
 
 # Set up logging configuration
 logging.basicConfig(level=logging.DEBUG)
@@ -31,13 +34,12 @@ logging.getLogger("opentelemetry").setLevel(logging.ERROR)
 logging.getLogger("pydantic_ai").setLevel(logging.WARNING)
 
 
+
 langfuse = Langfuse(
             public_key = settings.LANGFUSE_PUBLIC_KEY,
             secret_key = settings.LANGFUSE_SECRET_KEY,
             host = settings.LANGFUSE_HOST
         )
-
-
 
 class Assistant():
 
@@ -69,14 +71,31 @@ class Assistant():
         """ 
         #setup
         json_results = []
+        docs = []
         id = tool_call_attempt * limit # set starting id based on how many times tool has been called before
+    
         try:
+            #initialise Cohere reranker
+            co = cohere.Client(settings.COHERE_API_KEY)
+
             # perform vector search on database
-            results = self.hand_book_table.search(query, vector_column_name='vector').limit(limit).to_pydantic(HandbookChunk)
-        
-            # create dictionaries
+            results = self.hand_book_table.search(query, vector_column_name='vector').limit(100).to_pydantic(HandbookChunk)
+            
+            #get list of strings to rerank with Cohere
             for chunk in results:
+                docs.append(chunk.chunk)
+
+            #rerank and get top N results
+            reranked_results = co.rerank(model="rerank-v3.5", query = query, documents = docs, top_n = limit)
+            
+     
+            # create dictionaries based of the best scoring sources from the reranker
+            for item in reranked_results.results:
                 id += 1
+                logging.debug(f"Relevance score for source {id}: {item.relevance_score}")
+                index = item.index
+                chunk = results[index]
+                
                 chunk_dict = {
                     "id": id,
                     "source_url": chunk.source_url,
@@ -85,7 +104,8 @@ class Assistant():
                 json_results.append(chunk_dict)     
             return json_results
         except Exception as e:
-            return{"error": str(e)}
+            logging.error({"error during search_database": str(e)})
+            
         
     @property
     def hand_book_table(self):
@@ -110,7 +130,6 @@ class Assistant():
     def get_chat_history(self, session_id: str):
         try:
             results = self.history_table.search().where(f"session_id = '{session_id}'").limit(1).to_pydantic(ChatHistory)
-            logging.debug(results)
             if results:
                 return results[0].history, results[0].share_token
             else:
@@ -129,7 +148,6 @@ class Assistant():
         sources = []
         tools = []
         
-
         # get resuls from tool call out of Result object
         for message in result.all_messages():
                     for part in message.parts:
@@ -166,7 +184,6 @@ class Assistant():
             async with self.agent.run_stream(str(history)) as result:
 
                 sources, tools_used = self.get_tool_results(result, 'search_database', history)
-                logging.debug(result)
                 
                 metadata = ResponseMetadata(
                     sources = sources,
@@ -240,13 +257,11 @@ class Assistant():
             session_id = request.metadata['session_id']
             history = json.loads(history)
         
-        logging.debug(session_id)
-        logging.debug(history)
         # add user question to history
         history.append({'role': "User", "content": request.user['question']})
         
         # get streaming response from agent
-        retries = 3
+        retries = 1
         old_chunk = ""
         for attempt in range(retries):
             try:       
