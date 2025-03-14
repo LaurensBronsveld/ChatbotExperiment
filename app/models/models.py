@@ -74,3 +74,8 @@ class ChatHistory(LanceModel):
     session_id: str
     share_token: str
     history: str
+
+class SearchRequest(BaseModel):
+    query: str
+    tool_call_attempt: int
+    limit: int = 5

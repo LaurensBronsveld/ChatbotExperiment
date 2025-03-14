@@ -12,8 +12,9 @@ class Settings(BaseSettings):
     LANGFUSE_SECRET_KEY: str
     COHERE_API_KEY: str
     # DATABASE_URL: str           # not used yet
-    DATABASE_LOCATION: str = "./data/lancedb"
+    DATABASE_LOCATION: str = "postgresql+psycopg://postgres:password@localhost:5432/handbook_db"
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"
+    API_URL: str = "http://127.0.0.1:8000"
     HANDBOOK_TABLE: str = "embedded_handbook_with_urls"
     HISTORY_TABLE: str = "history_table"
     LLM_PROVIDER: str = "open-AI"

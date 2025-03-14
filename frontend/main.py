@@ -3,7 +3,7 @@ import requests
 import json
 
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = "http://127.0.0.1:8000/api"
 
 
 def get_response(query: str):
@@ -13,7 +13,7 @@ def get_response(query: str):
             f"{API_URL}/assistant/",
             json={"metadata": {"language": "nl",
                         "session_id": None,
-                        "tools": [{ "name": "HR", "enabled": True }]
+                        "tools": [{ "name": "search", "enabled": True }]
                     }, 
                     "user": {
                         "question": "Hoeveel dagen vakantie heb ik per jaar?",

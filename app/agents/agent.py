@@ -11,16 +11,20 @@ import uuid
 from pydantic import ValidationError
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ToolReturnPart, ToolCallPart
-from components.system_prompts import get_chatbot_prompt
+from agents.system_prompts import get_chatbot_prompt
 from models.models import *
+from models.SQL_models import *
 from agents.LLMs import get_model
-from components.DatabaseManager import DatabaseManager
+from components.DatabaseManager import get_session
 from config import settings
 from langfuse import Langfuse
 from langfuse.decorators import observe, langfuse_context
 import cohere
 from lancedb.rerankers import CohereReranker
 import logging
+from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session
+import openai
+import numpy as np
 
 
 # Set up logging configuration
@@ -43,12 +47,9 @@ langfuse = Langfuse(
 
 class Assistant():
 
-    def __init__(self, db: DatabaseManager, language: str):
+    def __init__(self, language: str):
         
-        self.model = get_model()        
-        self.agent = Agent(self.model, result_type=ResponseDict, system_prompt= get_chatbot_prompt(language))    
-
-        self.dbmanager = db
+        self.language = language
         self._handbook_table = None
         self._history_table = None
 
@@ -77,10 +78,24 @@ class Assistant():
         try:
             #initialise Cohere reranker
             co = cohere.Client(settings.COHERE_API_KEY)
-
+           
+            db_generator = get_session()
+            db = next(db_generator)
             # perform vector search on database
-            results = self.hand_book_table.search(query, vector_column_name='vector').limit(100).to_pydantic(HandbookChunk)
+            query_embedding = openai.embeddings.create(
+                input = query,
+                model=settings.EMBED_MODEL
+            ).data[0].embedding
+
+            query_vector = np.array(query_embedding).tolist()
             
+            results = (
+                db.query(Chunk)
+                .order_by(Chunk.embedding.l2_distance(query_vector))  # L2 distance for similarity
+                .limit(100)
+                .all()
+            )
+
             #get list of strings to rerank with Cohere
             for chunk in results:
                 docs.append(chunk.chunk)
@@ -88,7 +103,6 @@ class Assistant():
             #rerank and get top N results
             reranked_results = co.rerank(model="rerank-v3.5", query = query, documents = docs, top_n = limit)
             
-     
             # create dictionaries based of the best scoring sources from the reranker
             for item in reranked_results.results:
                 id += 1
@@ -98,13 +112,15 @@ class Assistant():
                 
                 chunk_dict = {
                     "id": id,
-                    "source_url": chunk.source_url,
+                    "source_url": chunk.source,
                     "chunk": chunk.chunk
                 }
                 json_results.append(chunk_dict)     
             return json_results
         except Exception as e:
             logging.error({"error during search_database": str(e)})
+        finally:
+            next(db_generator, None) # close the session.
             
         
     @property
@@ -117,31 +133,31 @@ class Assistant():
                 raise
         return self._handbook_table
     
-    @property
-    def history_table(self):
-        if self._history_table is None:
-            try:
-                self._history_table = self.dbmanager.get_table(settings.HISTORY_TABLE)
-            except Exception as e:
-                print(f"error accesssing table: {str(e)}")
-                raise
-        return self._history_table
+    # @property
+    # def history_table(self):
+    #     if self._history_table is None:
+    #         try:
+    #             self._history_table = self.dbmanager.get_table(settings.HISTORY_TABLE)
+    #         except Exception as e:
+    #             print(f"error accesssing table: {str(e)}")
+    #             raise
+    #     return self._history_table
     
-    def get_chat_history(self, session_id: str):
-        try:
-            results = self.history_table.search().where(f"session_id = '{session_id}'").limit(1).to_pydantic(ChatHistory)
-            if results:
-                return results[0].history, results[0].share_token
-            else:
-                return None
-        except Exception as e:
-            logging.error(f'error retrieving chat history: {e}')
+    # def get_chat_history(self, session_id: str):
+    #     try:
+    #         results = self.history_table.search().where(f"session_id = '{session_id}'").limit(1).to_pydantic(ChatHistory)
+    #         if results:
+    #             return results[0].history, results[0].share_token
+    #         else:
+    #             return None
+    #     except Exception as e:
+    #         logging.error(f'error retrieving chat history: {e}')
     
-    def update_chat_history(self, session_id: str, share_token: str, new_history: str):
-        try:
-            self.dbmanager.update_chat_history(table_name="history_table", session_id=session_id, share_token=share_token, new_history=new_history)
-        except Exception as e:
-            logging.error(f"something went wrong updating history : {e}")
+    # def update_chat_history(self, session_id: str, share_token: str, new_history: str):
+    #     try:
+    #         self.dbmanager.update_chat_history(table_name="history_table", session_id=session_id, share_token=share_token, new_history=new_history)
+    #     except Exception as e:
+    #         logging.error(f"something went wrong updating history : {e}")
        
     def get_tool_results(self, result: object, tool_name: str, history: List):
         content = []
@@ -173,15 +189,18 @@ class Assistant():
         return sources, tools
 
     @observe(capture_input=True, capture_output=True, as_type="generation", name="chatbot response")
-    async def process_answer(self, history: str, session_id: str, share_token: str, retries: int = 3):
+    async def process_answer(self, history: str, session_id: str, share_token: str):
             response = None
             old_content = ""
             
             trace_id = langfuse_context.get_current_trace_id()
             logging.debug(langfuse_context.get_current_trace_url())
             
+            model = get_model()        
+            agent = Agent(model, result_type=ResponseDict, system_prompt= get_chatbot_prompt(self.language))    
+
           
-            async with self.agent.run_stream(str(history)) as result:
+            async with agent.run_stream(str(history)) as result:
 
                 sources, tools_used = self.get_tool_results(result, 'search_database', history)
                 
@@ -232,13 +251,14 @@ class Assistant():
                             raise
                     
             history.append({'role': "Assistant", "content": content})
-            self.update_chat_history(session_id, share_token, json.dumps(history))
+            #self.update_chat_history(session_id, share_token, json.dumps(history))
 
     async def generate_response_stream(self, request: RequestModel):
         # define variables
         history = []
         session_id = ""
         share_token = ""
+        
 
         logging.debug(f"start {session_id}")
         # start langfuse trace
@@ -246,16 +266,17 @@ class Assistant():
             name = "chat_request"
         )
 
+
         # if session_id is null, generate one
         if not request.metadata['session_id']:
             logging.debug("test")
             session_id = str(uuid.uuid4())
             share_token = str(uuid.uuid4())
-        else:
-            # if session_id exists, retrieve chat history
-            history, share_token = self.get_chat_history(request.metadata['session_id'])
-            session_id = request.metadata['session_id']
-            history = json.loads(history)
+        # else:
+        #     # if session_id exists, retrieve chat history
+        #     history, share_token = self.get_chat_history(request.metadata['session_id'])
+        #     session_id = request.metadata['session_id']
+        #     history = json.loads(history)
         
         # add user question to history
         history.append({'role': "User", "content": request.user['question']})
