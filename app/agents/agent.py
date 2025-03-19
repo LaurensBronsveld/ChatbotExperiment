@@ -197,7 +197,7 @@ class Assistant():
             logging.debug(langfuse_context.get_current_trace_url())
             
             model = get_model()        
-            agent = Agent(model, result_type=ResponseDict, system_prompt= get_chatbot_prompt(self.language))    
+            agent = Agent(model, result_type=ResponseModel, system_prompt= get_chatbot_prompt(self.language))    
 
           
             async with agent.run_stream(str(history)) as result:
@@ -224,14 +224,14 @@ class Assistant():
                             if content != old_content:
                                 old_content = content
                                 # create response object
-                                response = ResponseDict(
+                                response = ResponseModel(
                                     content=chunk.get('content'), 
                                     )    
                                 yield(json.dumps(response).encode('utf-8') + b'\n')   
                         else: 
                             
                             # create response object
-                            response = ResponseDict(
+                            response = ResponseModel(
                                 content=content, 
                                 able_to_answer=chunk.get("able_to_answer"),
                                 question_classification= chunk.get('question_classification'),

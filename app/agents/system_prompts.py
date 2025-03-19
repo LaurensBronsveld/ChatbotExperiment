@@ -55,6 +55,10 @@ def get_chatbot_prompt(language: str):
                         You can not use your internal knowledge, or other websites from the internet.
                         Do not link to other pages as source for your information, all sources should be in the database.
 
+                        The input you receive might be a single question if its the start of a conversation. 
+                        If its a follow up question in an existing conversation you will receive the entire history of the conversation including results of tool calls that might have happened.
+                        Use this history as context for your answers.
+
                         The content part in your output should only contain your answer to the question, keep all other metadata and sources out of it.
                         Try to determine what the question classification is, for example technical, HR or general information etc
                         Suggest a few follow up questions the user might have after your response.

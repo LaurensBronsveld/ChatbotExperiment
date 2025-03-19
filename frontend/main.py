@@ -10,18 +10,15 @@ def get_response(query: str):
     try: 
         sources = []
         result = requests.post(
-            f"{API_URL}/assistant/",
+            f"{API_URL}/chat/",
             json={"metadata": {"language": "nl",
                         "session_id": None,
                         "tools": [{ "name": "search", "enabled": True }]
                     }, 
                     "user": {
+                        "user_id": 1,
                         "question": "Hoeveel dagen vakantie heb ik per jaar?",
-                        "context": [
-                            { "type": "file", "URL": "" }, 
-                            { "type": "snippet", "text": ""},
-                            { "type": "url", "url": "https://example.com" }
-                        ]
+                        "context": []
                     }
                     }
             )
@@ -35,14 +32,19 @@ def get_response(query: str):
         print({"error": e})
         
 def get_streaming_resonse(query: str, session_id: str):
+    if session_id:
+        post_url = f"{API_URL}/chat/{session_id}/"
+    else:
+        post_url = f"{API_URL}/chat/"
     try:
         response = requests.post(
-            f"{API_URL}/assistant/",
+            post_url,
             json={"metadata": {"language": "nl",
                         "session_id": session_id,
                         "tools": [{ "name": "HR", "enabled": True }]
                     }, 
                     "user": {
+                        "user_id": 1,
                         "question": query,
                         "context": [
                             { "type": "file", "URL": "" }, 

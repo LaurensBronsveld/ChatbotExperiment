@@ -4,8 +4,7 @@ from fastapi.responses import StreamingResponse
 import uvicorn
 
 from agents.agent import Assistant
-from api.chat.assistant import router as chat_router
-from api.tools.tools import router as tool_router
+
 from api import api_router
 from components.DatabaseManager import get_session
 from models.models import RequestModel

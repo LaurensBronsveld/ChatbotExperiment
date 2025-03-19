@@ -8,6 +8,7 @@ from sqlalchemy import create_engine, Column, Integer, String, LargeBinary
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session
 from sqlalchemy.dialects.postgresql import UUID
 from pgvector.sqlalchemy import Vector
+from models.SQL_models import Base
 
 
 
@@ -22,8 +23,6 @@ logging.getLogger("opentelemetry").setLevel(logging.ERROR)
 logging.getLogger("pydantic_ai").setLevel(logging.WARNING)
 
 
-
-Base = declarative_base()
 uri = settings.DATABASE_LOCATION
 engine = create_engine(
     url = settings.DATABASE_LOCATION,
