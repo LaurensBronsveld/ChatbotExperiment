@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
-from api.chat.chatV1 import router as chat_router
-from api.tools.tools import router as tool_router
-from api.history.history import router as history_router
+from app.api.chat.chatV1 import router as chat_router
+from app.api.tools.tools import router as tool_router
+from app.api.chat.history import router as history_router
 API_STR = "/api"
 
 api_router = APIRouter(prefix=API_STR)

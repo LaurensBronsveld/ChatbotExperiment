@@ -5,10 +5,10 @@ from fastapi import APIRouter
 
 
 from fastapi import APIRouter
-from models.SQL_models import *
-from models.models import SearchRequest
-from components.DatabaseManager import get_session
-from config import settings
+from app.models.SQL_models import *
+from app.models.models import SearchRequest
+from app.components.DatabaseManager import get_session
+from app.config import settings
 import cohere
 import logging
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session

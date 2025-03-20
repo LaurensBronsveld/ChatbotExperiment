@@ -3,13 +3,8 @@ from fastapi import FastAPI, Request, Depends, APIRouter
 from fastapi.responses import StreamingResponse
 import uvicorn
 
-from agents.agent import Assistant
+from app.api import api_router
 
-from api import api_router
-from components.DatabaseManager import get_session
-from models.models import RequestModel
-import sys
-import os
 
 main_router = APIRouter()
 

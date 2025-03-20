@@ -5,9 +5,9 @@ import uvicorn
 from uuid import uuid4, UUID
 
 
-from components.DatabaseManager import get_session
-from models.models import *
-from models.SQL_models import ConversationType, Conversation, ChatRole, ChatMessage
+from app.components.DatabaseManager import get_session
+from app.models.models import *
+from app.models.SQL_models import ConversationType, Conversation, ChatRole, ChatMessage
 from sqlalchemy import select
 import sys
 import os
@@ -86,9 +86,12 @@ async def get_conversation(session_id: UUID):
         db_generator = get_session()
         db = next(db_generator)
 
+        # get all conversations
         statement = select(Conversation).where(Conversation.session_id == session_id)  
         result = db.execute(statement)
         conversation = result.scalars().one()
+
+        # remodel into Pydantic model
         conv_model = ConversationModel(session_id = conversation.session_id,
                                       user_id = conversation.user_id,
                                       type = conversation.type,
@@ -104,25 +107,30 @@ async def get_conversation(session_id: UUID):
 @router.get("/history/{session_id}/")
 def get_history(session_id: UUID, show_system_calls: bool = False):
     try:
+        # get db session
         db_generator = get_session()
         db = next(db_generator)
-        conversation = db.query(Conversation).filter(Conversation.session_id == session_id).first()
 
+        # get conversation with corresponding session_id
+        conversation = db.query(Conversation).filter(Conversation.session_id == session_id).first()
+        
+        # exit if session does not exist
         if not conversation:
             return f"session with id: {session_id} does not exist"
 
-        dict = json.loads(conversation.chat_metadata)
-        metadata = MetadataModel(**dict)
+        # get metadata from conversation
+        metadata_dict = json.loads(conversation.chat_metadata)
+        metadata = MetadataModel(**metadata_dict)
 
+        # get all messages with the corresponding session_id
         result = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).all()
-
         messages = [] 
         for item in result:
             # skip system messages when fetching messages for front end
             if item.role == ChatRole.SYSTEM and show_system_calls == False:
                 continue
-            dict = json.loads(item.message)
-            messages.append(MessageModel(**dict))
+            message_dict = json.loads(item.message)
+            messages.append(MessageModel(**message_dict))
     
         history = ChatHistoryModel(
             metadata = metadata,

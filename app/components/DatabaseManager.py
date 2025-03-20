@@ -1,14 +1,14 @@
-from typing import Optional
-import lancedb
+
+
 import pandas as pd
-from models.models import *
+from app.models.models import *
 import logging
-from config import settings
+from app.config import settings
 from sqlalchemy import create_engine, Column, Integer, String, LargeBinary
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session
 from sqlalchemy.dialects.postgresql import UUID
 from pgvector.sqlalchemy import Vector
-from models.SQL_models import Base
+from app.models.SQL_models import Base
 
 
 

@@ -16,7 +16,12 @@ dependencies = [
     "langfuse>=2.59.7",
     "cohere>=5.14.0",
     "pgvector>=0.3.6",
+    "httpx>=0.28.1",
+    "SQLAlchemy>=2.0.39",
+    "pytest>=8.3.5",
+    
 ]
 
 [tool.uv]
 # uv specific settings can be placed here.
+

@@ -12,18 +12,16 @@ import requests
 from pydantic import ValidationError
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ToolReturnPart, ToolCallPart, ModelMessage, ModelMessagesTypeAdapter
-from agents.system_prompts import get_chatbot_prompt
-from models.models import *
-from models.SQL_models import *
-from agents.LLMs import get_model
-from components.DatabaseManager import get_session
-from api.history.history import get_history
-from api.tools.tools import search_database
-from config import settings
+from app.agents.system_prompts import get_chatbot_prompt
+from app.models.models import *
+from app.models.SQL_models import *
+from app.agents.LLMs import get_model
+from app.components.DatabaseManager import get_session
+from app.api.chat.history import get_history
+from app.api.tools.tools import search_database
+from app.config import settings
 from langfuse import Langfuse
 from langfuse.decorators import observe, langfuse_context
-import cohere
-from lancedb.rerankers import CohereReranker
 import logging
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session
 import openai
@@ -107,7 +105,6 @@ class BaseAgent():
         content = []
         sources = []
         tools = []
-        logging.debug(result)
         # get resuls from tool call out of Result object
         for message in result.all_messages():
                     for part in message.parts:
@@ -243,24 +240,50 @@ class BaseAgent():
         # commit and close database session
         db.close()
         
-    def generate_response(self, request: RequestModel):
+    async def generate_response(self, session_id, request: RequestModel):
         
-        # if session_id is null, generate one
-        if not request.metadata['session_id']:
-            request.metadata['session_id'] = str(uuid.uuid4())
-            
-        else:
-            # if session_id exists, retrieve chat history
-            history = self.get_chat_history(request.metadata['session_id'])
-            session_id = request.metadata['session_id']
-            history = json.loads(history)
+     # get database session
+        db_generator = get_session()
+        db = next(db_generator)
         
+        # start langfuse trace
+        fake_trace = uuid4()
         # add user question to history
-        history.append({'role': "User", "content": request.user['question']})
+        user_message = MessageModel(
+            role = ChatRole.USER,
+            content = request.user['question'],
+            context = request.user['context'])
+        self.update_chat_history(db, session_id, user_message)
+        
 
-        response = self.agent.run_sync(history)
-        history.append({'role': "Assistant", "content": response.content})
-        return response
+        model = get_model()        
+        agent = Agent(model, result_type=ResponseModel, system_prompt= get_chatbot_prompt(self.language))    
+        agent.tool(self.use_search_tool)
+
+           
+        history = self.get_chat_history(session_id)
+
+        response = await agent.run(str(history))
+        assistant_message = MessageModel(
+                    role = ChatRole.ASSISTANT,
+                    content = response.data.content)
+                                
+        self.update_chat_history(db, session_id, assistant_message)
+
+        # sources, tools_used = self.get_tool_results(self, result = response, tool_name= 'use_search_tool', db = db, session_id= session_id)
+                
+        # metadata = ResponseMetadata(
+        #         sources = sources,
+        #         tools_used = tools_used,
+        #         session_id = str(session_id),
+        #         trace_id = fake_trace) 
+        # metadata_json = metadata.model_dump_json()  
+
+        # commit and close database session
+        db.close()
+        response_json = response.data.model_dump_json()
+        return response_json
+        
  
 
 # db_manager = DatabaseManager()

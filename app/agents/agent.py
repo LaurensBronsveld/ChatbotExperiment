@@ -11,18 +11,16 @@ import uuid
 from pydantic import ValidationError
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ToolReturnPart, ToolCallPart
-from agents.system_prompts import get_chatbot_prompt
-from models.models import *
-from models.SQL_models import *
-from agents.LLMs import get_model
-from components.DatabaseManager import get_session
-from config import settings
+from app.agents.system_prompts import get_chatbot_prompt
+from app.models.models import *
+from app.models.SQL_models import *
+from app.agents.LLMs import get_model
+from app.components.DatabaseManager import get_session
+from app.config import settings
 from langfuse import Langfuse
 from langfuse.decorators import observe, langfuse_context
 import cohere
-from lancedb.rerankers import CohereReranker
 import logging
-from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session
 import openai
 import numpy as np
 
