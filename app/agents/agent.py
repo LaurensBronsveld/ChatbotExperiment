@@ -43,6 +43,7 @@ langfuse = Langfuse(
             host = settings.LANGFUSE_HOST
         )
 
+## OUTDATED
 class Assistant():
 
     def __init__(self, language: str):

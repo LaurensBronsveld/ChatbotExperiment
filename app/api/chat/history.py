@@ -25,7 +25,6 @@ logging.getLogger("opentelemetry").setLevel(logging.ERROR)
 logging.getLogger("pydantic_ai").setLevel(logging.WARNING)
 
 
-
 router = APIRouter()
 
 @router.post("/conversation/")

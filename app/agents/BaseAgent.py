@@ -18,7 +18,7 @@ from app.models.SQL_models import *
 from app.agents.LLMs import get_model
 from app.components.DatabaseManager import get_session
 from app.api.chat.history import get_history
-from app.api.tools.tools import search_database
+from app.api.tools.search import search_database
 from app.config import settings
 from langfuse import Langfuse
 from langfuse.decorators import observe, langfuse_context
