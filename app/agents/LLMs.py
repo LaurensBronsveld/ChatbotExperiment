@@ -14,3 +14,4 @@ def get_model():
     elif settings.LLM_PROVIDER.lower() == "anthropic":
         return AnthropicModel(settings.LLM_MODEL, api_key=settings.ANTHROPIC_API_KEY)
     
+

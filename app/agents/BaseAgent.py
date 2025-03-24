@@ -87,19 +87,19 @@ class BaseAgent():
             logging.error(f"something went wrong updating history : {e}")
        
        
-    def use_search_tool(self, ctx: RunContext, query: str, tool_call_atempt: int = 0, limit: int = 5):
-        # create url for tool
-        url = f"{settings.API_URL}/api/search/"
-        result = requests.post(
-            f"{url}",
-            json={  
-                "query": query, 
-                "tool_call_attempt": tool_call_atempt,
-                "limit": limit
-                }
-            )                  
-        data = result.json()
-        return data
+    def search_tool(self, ctx: RunContext, query: str, tool_call_atempt: int = 0, limit: int = 5):           
+        # create search request
+        request = SearchRequest(
+            query = query,
+            tool_call_attempt = tool_call_atempt,
+            limit = limit
+        )
+
+        # search database
+        result = search_database(request)
+
+      
+        return result
 
     def get_tool_results(self, ctx: RunContext, result: object, tool_name: str, db, session_id):
         content = []
@@ -145,7 +145,7 @@ class BaseAgent():
             
         model = get_model()        
         agent = Agent(model, result_type=ResponseModel, system_prompt= get_chatbot_prompt(self.language))    
-        agent.tool(self.use_search_tool)
+        agent.tool(self.search_tool)
         history = self.get_chat_history(session_id)
       
         async with agent.run_stream(str(history)) as result:
@@ -241,10 +241,10 @@ class BaseAgent():
         db.close()
         
     async def generate_response(self, session_id, request: RequestModel):
-        
-     # get database session
+        # get database session
         db_generator = get_session()
         db = next(db_generator)
+        
         
         # start langfuse trace
         fake_trace = uuid4()
@@ -257,10 +257,9 @@ class BaseAgent():
         
 
         model = get_model()        
-        agent = Agent(model, result_type=ResponseModel, system_prompt= get_chatbot_prompt(self.language))    
-        agent.tool(self.use_search_tool)
+        agent = Agent(model, result_type=ResponseModel, system_prompt= get_chatbot_prompt(self.language))
+        agent.tool(self.search_tool)
 
-           
         history = self.get_chat_history(session_id)
 
         response = await agent.run(str(history))
@@ -270,19 +269,19 @@ class BaseAgent():
                                 
         self.update_chat_history(db, session_id, assistant_message)
 
-        # sources, tools_used = self.get_tool_results(self, result = response, tool_name= 'use_search_tool', db = db, session_id= session_id)
+        sources, tools_used = self.get_tool_results(self, result = response, tool_name= 'use_search_tool', db = db, session_id= session_id)
                 
-        # metadata = ResponseMetadata(
-        #         sources = sources,
-        #         tools_used = tools_used,
-        #         session_id = str(session_id),
-        #         trace_id = fake_trace) 
-        # metadata_json = metadata.model_dump_json()  
+        metadata = ResponseMetadata(
+                sources = sources,
+                tools_used = tools_used,
+                session_id = str(session_id),
+                trace_id = str(fake_trace)) 
+        metadata_json = metadata.model_dump_json()  
 
         # commit and close database session
         db.close()
         response_json = response.data.model_dump_json()
-        return response_json
+        return {'metadata': metadata_json, 'response': response_json}
         
  
 

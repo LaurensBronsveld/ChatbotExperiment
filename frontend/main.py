@@ -41,7 +41,7 @@ def get_streaming_resonse(query: str, session_id: str):
             post_url,
             json={"metadata": {"language": "nl",
                         "session_id": session_id,
-                        "tools": [{ "name": "HR", "enabled": True }]
+                        "tools": [{ "name": "RAG", "enabled": True }]
                     }, 
                     "user": {
                         "user_id": 1,
