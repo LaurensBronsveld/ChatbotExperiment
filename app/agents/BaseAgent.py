@@ -119,6 +119,8 @@ class BaseAgent():
         content = []
         sources = []
         tools = []
+        seen_urls = set()
+
         # get resuls from tool call out of Result object
         for message in result.all_messages():
             for part in message.parts:
@@ -135,17 +137,25 @@ class BaseAgent():
 
 
         # create source objects 
-        for source in content: 
+        for source in content:
+            url = source["source_url"]
+            id = source["id"]
+            if url in seen_urls:
+                continue
+            
+            # add url to set
+            seen_urls.add(url)
+
             url_regex = r"^(https?:\/\/|www\.)\S+$"   # regex which matches most urls starting with http(s)// or www.
             uri_regex = r"^(?:[a-zA-Z]:\\|\/)[^\s]*$" # regex which matches absolute file paths in windows and unix systems
             # check type of source (rough implementation, probably better to do this while building database)
            
-            if re.match(url_regex, source['source_url']):
-                sources.append(SourceDict(id = source['id'], type = 'url', url=source["source_url"], used=False))
-            elif re.match(uri_regex, source['source_url']):
-                sources.append(SourceDict(id = source["id"], type = 'file', uri=source["source_url"], used=False))
+            if re.match(url_regex, url):
+                sources.append(SourceDict(id = id, type = 'url', url=url, used=False))
+            elif re.match(uri_regex, url):
+                sources.append(SourceDict(id = id, type = 'file', uri=url, used=False))
             else:
-                sources.append(SourceDict(id = source['id'], type = 'snippet', text="some text", used=False))
+                sources.append(SourceDict(id = id, type = 'snippet', text="some text", used=False))
         
         return sources, tools
 
@@ -164,8 +174,8 @@ class BaseAgent():
       
         async with agent.run_stream(str(history)) as result:
 
-            sources, tools_used = self.get_tool_results(self, result = result, tool_name= 'use_search_tool', db = db, session_id= session_id)
-                
+            sources, tools_used = self.get_tool_results(self, result = result, tool_name= 'search_tool', db = db, session_id= session_id)
+            logging.debug(sources)   
             metadata = ResponseMetadata(
                 sources = sources,
                 tools_used = tools_used,

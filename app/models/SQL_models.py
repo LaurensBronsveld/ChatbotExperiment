@@ -102,7 +102,7 @@ class Document(Base):
     subject = Column(Enum(DocumentSubject), name = "subject of document")
     location = Column(String(255))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    children: Mapped[list["Chunk"]] = relationship()
+    chunks: Mapped[list["Chunk"]] = relationship()
     
     class Config:
         orm_mode = True

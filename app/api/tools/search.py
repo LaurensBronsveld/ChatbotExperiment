@@ -11,7 +11,7 @@ from app.components.DatabaseManager import get_session
 from app.config import settings
 import cohere
 import logging
-from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session
+from sqlalchemy.orm import declarative_base, sessionmaker, Session, scoped_session, joinedload
 from sqlalchemy import desc
 import openai
 import numpy as np
@@ -19,68 +19,104 @@ import numpy as np
 
 router = APIRouter()
 
-def dense_search(query: str, db: scoped_session, query_method: str = "cosine_distance", n: int = 10, explain = False):
+def dense_search(
+    query: str,
+    db: scoped_session,
+    query_method: str = "cosine_distance",
+    n: int = 10
+) -> list[dict]:
+    """
+    Performs dense vector similarity search using OpenAI embeddings and pgvector.
 
-    # perform vector search on database
-    query_embedding = openai.embeddings.create(
-        input = query,
-        model=settings.EMBED_MODEL
-        ).data[0].embedding
+    Args:
+        query (str): The natural language query to embed and search with.
+        db (scoped_session): SQLAlchemy database session.
+        query_method (str): Distance metric to use for similarity (e.g., cosine_distance).
+        n (int): Number of top results to retrieve.
+        explain (bool): Whether to return additional debug information.
 
-    query_vector = np.array(query_embedding).tolist()
-    
-    # Define comparator options
-    comparators = {
-        "l2_distance": Chunk.embedding.l2_distance(query_vector),
-        "l1_distance": Chunk.embedding.l1_distance(query_vector),
-        "cosine_distance": Chunk.embedding.cosine_distance(query_vector),
-        "dot_product": Chunk.embedding.max_inner_product(query_vector)  # Dot product needs descending order
-    }
-
-    query_results = (
-        db.query(Chunk, comparators[query_method].label("cosine_distance"))
-        .order_by(comparators[query_method])
-        .limit(n)
-        .all()
-    )
-    
-    # Convert tuples to chunks with scores
-    scored_chunks = [
-        {
-            "chunk": chunk,
-            "similarity_score": 1 - cosine_distance # Attach similarity score
-        }
-        for chunk, cosine_distance in query_results
-    ]
-        
-    return scored_chunks
-
-def sparse_search(query: str, db: scoped_session, n: int = 10):
-
+    Returns:
+        list[dict]: A list of chunks with their similarity scores.
+    """
     try:
- 
-        tsquery = func.websearch_to_tsquery('english', query)
-        rank_func = func.ts_rank_cd(Chunk.chunk_tsv, tsquery).label('rank')
-        
-        results = (db.query(Chunk, rank_func)
-            .where(Chunk.chunk_tsv.op('@@')(tsquery))
-            .order_by(desc(rank_func)) # Higher rank is better
-            .limit(n).all()
+        # Get vector embedding for the query
+        query_embedding = openai.embeddings.create(
+            input=query,
+            model=settings.EMBED_MODEL
+        ).data[0].embedding
+        query_vector = np.array(query_embedding).tolist()
+
+        # Distance function map
+        comparators = {
+            "l2_distance": Chunk.embedding.l2_distance(query_vector),
+            "l1_distance": Chunk.embedding.l1_distance(query_vector),
+            "cosine_distance": Chunk.embedding.cosine_distance(query_vector),
+            "dot_product": Chunk.embedding.max_inner_product(query_vector)
+        }
+
+        if query_method not in comparators:
+            raise ValueError(f"Invalid query method '{query_method}'")
+
+        comparator = comparators[query_method]
+
+        # Run DB query with eager-loaded document
+        query_results = (
+            db.query(Chunk, comparator.label("score"))
+            # .options(joinedload(Chunk.document))
+            .order_by(comparator)
+            .limit(n)
+            .all()
         )
-        # Convert tuples to chunks with scores
+
+        # Normalize cosine distance (lower = better)
         scored_chunks = [
             {
                 "chunk": chunk,
-                "rank": rank_score  # Attach ranking score
+                "similarity_score": 1 - score if query_method == "cosine_distance" else score
             }
-            for chunk, rank_score in results
+            for chunk, score in query_results
         ]
-       
+
         return scored_chunks
     except Exception as e:
-        print(f"Something went wrong during sparse search: {e}")
-    finally:
-        db.close()
+        print(f"[sparse_search] Search failed: {e}")
+        return []
+
+
+def sparse_search(query: str, db: scoped_session, n: int = 10) -> list[dict]:
+    """
+    Performs sparse full-text search using PostgreSQL's tsvector and ts_rank_cd.
+
+    Args:
+        query (str): The user query for text search.
+        db (scoped_session): SQLAlchemy session.
+        n (int): Number of results to return.
+
+    Returns:
+        list[dict]: Ranked chunks with relevance scores.
+    """
+    try:
+        tsquery = func.websearch_to_tsquery('english', query)
+        rank_func = func.ts_rank_cd(Chunk.chunk_tsv, tsquery).label('rank')
+
+        results = (
+            db.query(Chunk, rank_func)
+            # .options(joinedload(Chunk.document))
+            .where(Chunk.chunk_tsv.op('@@')(tsquery))
+            .order_by(desc(rank_func))
+            .limit(n)
+            .all()
+        )
+
+        return [
+            {"chunk": chunk, "rank": rank}
+            for chunk, rank in results
+        ]
+    except Exception as e:
+        print(f"[sparse_search] Search failed: {e}")
+        return []
+
+  
     
 def hybrid_search(query: str, db: scoped_session, dense_comparator: str = "cosine_distance", alpha: float = 0.5, n: int = 10):
     """
@@ -211,4 +247,4 @@ def search_database(request: SearchRequest):
         except Exception as e:
             logging.error({"error during search_database": str(e)})
         finally:
-            next(db_generator, None) # close the session.
+            db.close()
