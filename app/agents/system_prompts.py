@@ -58,13 +58,21 @@ def get_chatbot_prompt(language: str):
 
                         The input you receive might be a single question if its the start of a conversation. 
                         If its a follow up question in an existing conversation you will receive the entire history of the conversation including results of tool calls that might have happened.
-                        Use this history as context for your answers.
+                        Use this history as context for your answers. If you feel like the question is to vague to answer or find related documents, please ask the user for additional details.
 
                         The content part in your output should only contain your answer to the question, keep all other metadata and sources out of it.
                         Try to determine what the question classification is, for example technical, HR or general information etc
                         Also determine if you were able to answer the user's question with either True or False. If you arent able to give a detailed answer it should be False
                         Suggest a few follow up questions the user might have after your response.
                         If its unclear in what language you should answer, answer the question in {languages[language]}.
+
+                        [tool instructions]
+                        Search_tool: 
+                            Use this tool to search relevant data in your database related to the question.
+                            You can use the tool multiple times if the results aren't enough to answer the question.
+                            parameters:
+                                query: The query to search for. You should try to use relevant keywords and when possible translate the query to english because the documents are in english.
+                                tool_call_attempt: This keeps track of how often the search tool has been called to id the retrieved sources. This should be 0 on your first call, and incremented by 1 every time you reuse it.
                         """
     
     return prompt

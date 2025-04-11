@@ -87,7 +87,21 @@ class BaseAgent():
             logging.error(f"something went wrong updating history : {e}")
        
        
-    def search_tool(self, ctx: RunContext, query: str, tool_call_atempt: int = 0, limit: int = 5):           
+    def search_tool(self, ctx: RunContext, query: str, tool_call_atempt: int = 0, limit: int = 5):
+        """
+        Searches the handbook database using the provided query for relevant chunks of information.
+        
+        This method performs a vector search on the database containing embedded chunks of the Gitlab Handbook.
+        It returns the top X matching results from the database in the form of a JSON list of dictionaries with ID, source and content
+        Args:
+            ctx (RunContext): The context of the current run, providing access to dependencies and state.
+            query (str): The search query to use against the handbook database.
+            tool_call_attempt (int): The attempt number of the tool call, used to generate unique IDs for results. First attempt is 0.
+
+        Returns:
+            list[dict] or dict: A list of dictionaries, where each dictionary represents a search result
+                            containing the 'id', 'source_url', and 'chunk'. 
+        """            
         # create search request
         request = SearchRequest(
             query = query,
@@ -105,33 +119,43 @@ class BaseAgent():
         content = []
         sources = []
         tools = []
+        seen_urls = set()
+
         # get resuls from tool call out of Result object
         for message in result.all_messages():
-                    for part in message.parts:
-                        if isinstance(part, ToolReturnPart) and part.tool_name == tool_name:
+            for part in message.parts:
+                if isinstance(part, ToolReturnPart) and part.tool_name == tool_name:
 
-                            content.extend(part.content)
-                            tools.append(part.tool_name)
-                            
-                            system_message = MessageModel(
-                                role = ChatRole.SYSTEM,
-                                content = f"Called tool: {tool_name}. Results: {part.content}")
-                                
-                            self.update_chat_history(db, session_id, system_message)
+                    content.extend(part.content)
+                    tools.append(part.tool_name)
+                    
+                    system_message = MessageModel(
+                        role = ChatRole.SYSTEM,
+                        content = f"Called tool: {tool_name}. Results: {part.content}")
+                        
+                    self.update_chat_history(db, session_id, system_message)
 
 
         # create source objects 
-        for source in content: 
+        for source in content:
+            url = source["source_url"]
+            id = source["id"]
+            if url in seen_urls:
+                continue
+            
+            # add url to set
+            seen_urls.add(url)
+
             url_regex = r"^(https?:\/\/|www\.)\S+$"   # regex which matches most urls starting with http(s)// or www.
             uri_regex = r"^(?:[a-zA-Z]:\\|\/)[^\s]*$" # regex which matches absolute file paths in windows and unix systems
             # check type of source (rough implementation, probably better to do this while building database)
            
-            if re.match(url_regex, source['source_url']):
-                sources.append(SourceDict(id = source['id'], type = 'url', url=source["source_url"], used=False))
-            elif re.match(uri_regex, source['source_url']):
-                sources.append(SourceDict(id = source["id"], type = 'file', uri=source["source_url"], used=False))
+            if re.match(url_regex, url):
+                sources.append(SourceDict(id = id, type = 'url', url=url, used=False))
+            elif re.match(uri_regex, url):
+                sources.append(SourceDict(id = id, type = 'file', uri=url, used=False))
             else:
-                sources.append(SourceDict(id = source['id'], type = 'snippet', text="some text", used=False))
+                sources.append(SourceDict(id = id, type = 'snippet', text="some text", used=False))
         
         return sources, tools
 
@@ -150,8 +174,8 @@ class BaseAgent():
       
         async with agent.run_stream(str(history)) as result:
 
-            sources, tools_used = self.get_tool_results(self, result = result, tool_name= 'use_search_tool', db = db, session_id= session_id)
-                
+            sources, tools_used = self.get_tool_results(self, result = result, tool_name= 'search_tool', db = db, session_id= session_id)
+
             metadata = ResponseMetadata(
                 sources = sources,
                 tools_used = tools_used,

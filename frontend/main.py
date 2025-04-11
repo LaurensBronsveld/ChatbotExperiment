@@ -56,7 +56,6 @@ def get_streaming_resonse(query: str, session_id: str):
             stream=True,
             headers = {'Accept': 'text/event-stream'}
             )
-        print(response)
         return response
     except Exception as e:
         print({"error": e})
@@ -102,7 +101,7 @@ def main():
                     #process streaming response
                     for chunk in response_stream.iter_content(chunk_size=None, decode_unicode=True):
                         data = json.loads(chunk)
-                        print(data)
+
                         # first chunk is metadata
                         if not metadata_received:
                             sources = data['sources']

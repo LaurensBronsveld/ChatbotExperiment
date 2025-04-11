@@ -38,6 +38,10 @@ def get_session():
     finally:
         db.close()
 
+def recreate_tables():
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+
 # def get_table(table_name: str):
 #         return db.open_table(table_name)
     
