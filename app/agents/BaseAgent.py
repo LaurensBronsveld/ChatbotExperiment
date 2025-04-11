@@ -87,7 +87,21 @@ class BaseAgent():
             logging.error(f"something went wrong updating history : {e}")
        
        
-    def search_tool(self, ctx: RunContext, query: str, tool_call_atempt: int = 0, limit: int = 5):           
+    def search_tool(self, ctx: RunContext, query: str, tool_call_atempt: int = 0, limit: int = 5):
+        """
+        Searches the handbook database using the provided query for relevant chunks of information.
+        
+        This method performs a vector search on the database containing embedded chunks of the Gitlab Handbook.
+        It returns the top X matching results from the database in the form of a JSON list of dictionaries with ID, source and content
+        Args:
+            ctx (RunContext): The context of the current run, providing access to dependencies and state.
+            query (str): The search query to use against the handbook database.
+            tool_call_attempt (int): The attempt number of the tool call, used to generate unique IDs for results. First attempt is 0.
+
+        Returns:
+            list[dict] or dict: A list of dictionaries, where each dictionary represents a search result
+                            containing the 'id', 'source_url', and 'chunk'. 
+        """            
         # create search request
         request = SearchRequest(
             query = query,
@@ -107,17 +121,17 @@ class BaseAgent():
         tools = []
         # get resuls from tool call out of Result object
         for message in result.all_messages():
-                    for part in message.parts:
-                        if isinstance(part, ToolReturnPart) and part.tool_name == tool_name:
+            for part in message.parts:
+                if isinstance(part, ToolReturnPart) and part.tool_name == tool_name:
 
-                            content.extend(part.content)
-                            tools.append(part.tool_name)
-                            
-                            system_message = MessageModel(
-                                role = ChatRole.SYSTEM,
-                                content = f"Called tool: {tool_name}. Results: {part.content}")
-                                
-                            self.update_chat_history(db, session_id, system_message)
+                    content.extend(part.content)
+                    tools.append(part.tool_name)
+                    
+                    system_message = MessageModel(
+                        role = ChatRole.SYSTEM,
+                        content = f"Called tool: {tool_name}. Results: {part.content}")
+                        
+                    self.update_chat_history(db, session_id, system_message)
 
 
         # create source objects 

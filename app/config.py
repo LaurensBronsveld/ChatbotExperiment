@@ -13,13 +13,14 @@ class Settings(BaseSettings):
     COHERE_API_KEY: str
     # DATABASE_URL: str           # not used yet
     DATABASE_LOCATION: str = "postgresql+psycopg://postgres:password@localhost:5432/handbook_db"
+    TEST_DATABASE_URL: str = "postgresql+psycopg://postgres:password@localhost:5432/test_db"
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"
     API_URL: str = "http://127.0.0.1:8000"
     HANDBOOK_TABLE: str = "embedded_handbook_with_urls"
     HISTORY_TABLE: str = "history_table"
     LLM_PROVIDER: str = "open-AI"
     LLM_MODEL: str = "gpt-4o"
-    EMBED_MODEL: str = "text-embedding-3-large"
+    EMBED_MODEL: str = "text-embedding-3-small"
 
     model_config = ConfigDict(
         env_file=".env",

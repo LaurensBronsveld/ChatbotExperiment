@@ -44,6 +44,7 @@ class SourceDict(TypedDict):
     text: NotRequired[Optional[str]]
     uri: NotRequired[Optional[str]]
     used: Required[bool] 
+    
 # class SourceDict(TypedDict):
 #     id: int = Field(description="ID of source used for citations and determining if the source is used or not")
 #     type: str = Field(description="The type of source (e.g., url, snippet, file).")
