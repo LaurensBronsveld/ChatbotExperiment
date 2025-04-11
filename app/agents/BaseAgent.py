@@ -175,7 +175,7 @@ class BaseAgent():
         async with agent.run_stream(str(history)) as result:
 
             sources, tools_used = self.get_tool_results(self, result = result, tool_name= 'search_tool', db = db, session_id= session_id)
-            logging.debug(sources)   
+
             metadata = ResponseMetadata(
                 sources = sources,
                 tools_used = tools_used,
