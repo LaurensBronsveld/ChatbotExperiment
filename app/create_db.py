@@ -22,7 +22,6 @@ def create_database(mode: str = "append"):
 
 
 if __name__ == "__main__":
-    print(TextChunker)
     mode = "append"  # Default: append
 
     if len(sys.argv) > 1:

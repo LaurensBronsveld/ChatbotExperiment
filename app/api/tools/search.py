@@ -39,6 +39,7 @@ def dense_search(
         list[dict]: A list of chunks with their similarity scores.
     """
     try:
+        print('test')
         # Get vector embedding for the query
         query_embedding = openai.embeddings.create(
             input=query,
@@ -207,20 +208,7 @@ def search_database(request: SearchRequest):
                 print(result)
                 break
             chunks = [result["chunk"] for result in results]
-            # query_embedding = openai.embeddings.create(
-            #     input = query,
-            #     model=settings.EMBED_MODEL
-            # ).data[0].embedding
-
-            # query_vector = np.array(query_embedding).tolist()
-            
-            # results = (
-            #     db.query(Chunk)
-            #     .order_by(Chunk.embedding.l2_distance(query_vector))  # L2 distance for similarity
-            #     .limit(100)
-            #     .all()
-            # )
-
+      
             #get list of strings to rerank with Cohere
             for chunk in chunks:
                 docs.append(chunk.chunk)
@@ -248,3 +236,12 @@ def search_database(request: SearchRequest):
             logging.error({"error during search_database": str(e)})
         finally:
             db.close()
+
+def main():
+    dense_search("test", next(get_session()))
+
+
+if __name__ == "__main__":
+    
+
+    main()
