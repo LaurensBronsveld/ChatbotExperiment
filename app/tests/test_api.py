@@ -129,7 +129,11 @@ def test_changing_LLM_model():
     model = get_model()
     assert isinstance(model, AnthropicModel)
     test_new_chat_without_RAG()
-   
+
+    # reset provider and model
+    settings.LLM_PROVIDER = "open-AI"
+    settings.LLM_MODEL = "gpt-4o"
+
 def test_streaming_endpoint():
     """
     Tests if the streaming endpoint correctly returns a streamed response
@@ -149,11 +153,12 @@ def test_streaming_endpoint():
 
         # Process and validate chunks
         chunks = []
+
         for chunk in response.iter_lines():
+
             if chunk:
                 chunks.extend(chunk)
 
-                
         # Verify we got multiple chunks
         assert len(chunks) > 1 
 

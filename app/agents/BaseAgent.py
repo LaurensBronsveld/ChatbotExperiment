@@ -153,11 +153,11 @@ class BaseAgent():
             # check type of source (rough implementation, probably better to do this while building database)
            
             if re.match(url_regex, url):
-                sources.append(SourceDict(id = id, type = 'url', url=url, used=False, text=text))
+                sources.append(SourceDict(id = id, type = 'url', url=url, text=text))
             elif re.match(uri_regex, url):
-                sources.append(SourceDict(id = id, type = 'file', uri=url, used=False), text=text)
+                sources.append(SourceDict(id = id, type = 'file', uri=url, text=text))
             else:
-                sources.append(SourceDict(id = id, type = 'snippet', text="some text", used=False))
+                sources.append(SourceDict(id = id, type = 'snippet', text=text))
         
         return sources, tools
 

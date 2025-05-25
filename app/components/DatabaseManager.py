@@ -38,9 +38,6 @@ def get_session():
     finally:
         db.close()
 
-async def get_db_factory() -> async_sessionmaker:
-    return async_sessionmaker(engine, expire_on_commit=False)
-    
 
 def recreate_tables():
     Base.metadata.drop_all(engine)
