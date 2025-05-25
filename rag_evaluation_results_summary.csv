@@ -1,0 +1,31 @@
+Question ID,Question,Retrieval Success,Precision,Recall,F1 Score,Semantic Similarity,Lexical Overlap
+1,What is GitLab's approach to compensation?,True,0.25,1.0,0.4,0.8543900847434998,0.1935483870967742
+2,How does GitLab handle remote work?,False,0.0,0.0,0,0.7199695706367493,0.09714285714285714
+3,What are GitLab's core values?,True,0.5,1.0,0.6666666666666666,0.8145167827606201,0.21296296296296297
+4,What is GitLab's approach to feature flags?,False,0.0,0.0,0,0.8006327748298645,0.09595959595959595
+5,How does GitLab handle database changes and migrations?,False,0.0,0.0,0,0.7913253903388977,0.09326424870466321
+6,What is GitLab's Merge Request workflow?,False,0.0,0.0,0,0.7623341083526611,0.11926605504587157
+7,How does GitLab's stock option program work?,False,0.0,0.0,0,0.8096883296966553,0.11574074074074074
+8,What health benefits does GitLab offer to employees?,False,0.0,0.0,0,0.7791206240653992,0.1791044776119403
+9,What is GitLab's parental leave policy?,False,0.0,0.0,0,0.9470306634902954,0.1981981981981982
+10,How does GitLab handle incident management?,True,1.0,1.0,1.0,0.8696820735931396,0.12334801762114538
+11,What is GitLab's approach to product development?,False,0.0,0.0,0,0.8400380611419678,0.11682242990654206
+12,How does GitLab handle security vulnerabilities?,False,0.0,0.0,0,0.8598631024360657,0.09821428571428571
+13,What is GitLab's mission and vision?,False,0.0,0.0,0,0.8194254636764526,0.17164179104477612
+14,How does GitLab approach pricing for its products?,False,0.0,0.0,0,0.8437613844871521,0.1232876712328767
+15,What is GitLab's approach to OKRs (Objectives and Key Results)?,True,0.25,1.0,0.4,0.9134484529495239,0.14583333333333334
+16,How does GitLab's customer success team operate?,True,0.5,1.0,0.6666666666666666,0.7825609445571899,0.13526570048309178
+17,What is GitLab's approach to the open source community?,False,0.0,0.0,0,0.8026463985443115,0.1065989847715736
+18,How does GitLab handle customer feedback?,False,0.0,0.0,0,0.8311452865600586,0.14150943396226415
+19,What is GitLab's approach to GDPR compliance?,False,0.0,0.0,0,0.8499523997306824,0.1349206349206349
+20,What is GitLab's code of business conduct and ethics?,True,0.2,1.0,0.33333333333333337,0.8793169260025024,0.1794871794871795
+21,I'm interviewing for a role at GitLab. What are the typical stages involved in the hiring process after the initial application screening?,False,0.0,0.0,0,0.8716681003570557,0.2751677852348993
+22,"My team wants to improve our workflow efficiency. How does GitLab define ""Efficiency"" as a value, and where can I find practical examples or suggestions in the handbook?",False,0.0,0.0,0,0.7796380519866943,0.12663755458515283
+23,"I need to take a few days off next month. What's the exact procedure for requesting Paid Time Off (PTO), and do I need to specify a reason?",False,0.0,0.0,0,0.8678692579269409,0.21393034825870647
+24,"How does GitLab actively promote Diversity, Inclusion, and Belonging (DIB) within the company, beyond just stating it as a value?",True,0.3333333333333333,1.0,0.5,0.7865962982177734,0.1721311475409836
+25,"How often are performance reviews conducted at GitLab, and what is the ""Performance/Growth Factor"" mentioned in the handbook?",False,0.0,0.0,0,0.7873451709747314,0.18
+26,"I need a license for Figma for my design work. What's the official process for requesting this software, and who needs to approve it?",False,0.0,0.0,0,0.8959764838218689,0.1651376146788991
+27,My CI/CD pipeline failed with a 'script timeout' error while running tests. Where in the handbook can I find common causes and troubleshooting steps for pipeline timeouts?,False,0.0,0.0,0,0.8167635202407837,0.16033755274261605
+28,"I'm based in the Netherlands and expecting a child. Where can I find the specific details on GitLab's parental leave policy duration, eligibility, and pay for employees in my country?",False,0.0,0.0,0,0.9111093282699585,0.2682926829268293
+29,"I think I've discovered a security vulnerability in a GitLab feature. What is the correct, responsible way to report this to GitLab's security team?",False,0.0,0.0,0,0.8417173624038696,0.20930232558139536
+30,"As a remote employee, I need a better ergonomic chair for my home office. Can I expense this? If so, what's the maximum amount I can spend, and what's the procedure?",False,0.0,0.0,0,0.892215371131897,0.27

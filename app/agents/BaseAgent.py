@@ -48,7 +48,7 @@ langfuse = Langfuse(
 
 class BaseAgent():
 
-    def __init__(self, language: str):
+    def __init__(self, language: str = 'en'):
         
         self.language = language
         self.tools = []
@@ -87,7 +87,7 @@ class BaseAgent():
             logging.error(f"something went wrong updating history : {e}")
        
        
-    def search_tool(self, ctx: RunContext, query: str, tool_call_atempt: int = 0, limit: int = 5):
+    def search_tool(self, ctx: RunContext, query: str, tool_call_attempt: int = 0, limit: int = 5):
         """
         Searches the handbook database using the provided query for relevant chunks of information.
         
@@ -100,12 +100,12 @@ class BaseAgent():
 
         Returns:
             list[dict] or dict: A list of dictionaries, where each dictionary represents a search result
-                            containing the 'id', 'source_url', and 'chunk'. 
+                            containing the 'id', 'source', and 'chunk'. 
         """            
         # create search request
         request = SearchRequest(
             query = query,
-            tool_call_attempt = tool_call_atempt,
+            tool_call_attempt = tool_call_attempt,
             limit = limit
         )
 
@@ -115,7 +115,7 @@ class BaseAgent():
       
         return result
 
-    def get_tool_results(self, ctx: RunContext, result: object, tool_name: str, db, session_id):
+    def get_tool_results(self, ctx: RunContext, result: object, tool_name: str, db, session_id = None):
         content = []
         sources = []
         tools = []
@@ -129,33 +129,35 @@ class BaseAgent():
                     content.extend(part.content)
                     tools.append(part.tool_name)
                     
-                    system_message = MessageModel(
-                        role = ChatRole.SYSTEM,
-                        content = f"Called tool: {tool_name}. Results: {part.content}")
-                        
-                    self.update_chat_history(db, session_id, system_message)
+                    if session_id:
+                        system_message = MessageModel(
+                            role = ChatRole.SYSTEM,
+                            content = f"Called tool: {tool_name}. Results: {part.content}")
+                            
+                        self.update_chat_history(db, session_id, system_message)
 
 
         # create source objects 
         for source in content:
-            url = source["source_url"]
+            url = source["source"]
             id = source["id"]
-            if url in seen_urls:
-                continue
+            text = source["chunk"]
+            # if url in seen_urls:
+            #     continue
             
-            # add url to set
-            seen_urls.add(url)
+            # # add url to set
+            # seen_urls.add(url)
 
             url_regex = r"^(https?:\/\/|www\.)\S+$"   # regex which matches most urls starting with http(s)// or www.
             uri_regex = r"^(?:[a-zA-Z]:\\|\/)[^\s]*$" # regex which matches absolute file paths in windows and unix systems
             # check type of source (rough implementation, probably better to do this while building database)
            
             if re.match(url_regex, url):
-                sources.append(SourceDict(id = id, type = 'url', url=url, used=False))
+                sources.append(SourceDict(id = id, type = 'url', url=url, text=text))
             elif re.match(uri_regex, url):
-                sources.append(SourceDict(id = id, type = 'file', uri=url, used=False))
+                sources.append(SourceDict(id = id, type = 'file', uri=url, text=text))
             else:
-                sources.append(SourceDict(id = id, type = 'snippet', text="some text", used=False))
+                sources.append(SourceDict(id = id, type = 'snippet', text=text))
         
         return sources, tools
 
@@ -306,6 +308,26 @@ class BaseAgent():
         db.close()
         response_json = response.data.model_dump_json()
         return {'metadata': metadata_json, 'response': response_json}
+    
+    def generate_simple_response(self, request: str) -> str:
+        # Get database session
+        db_generator = get_session()
+        db = next(db_generator)
+ 
+        # Get model and setup agent
+        model = get_model()
+        agent = Agent(model, system_prompt=get_chatbot_prompt(self.language))
+        agent.tool(self.search_tool)
+
+        
+        response = agent.run_sync(request) 
+        sources, tools_used = self.get_tool_results(self, result = response, tool_name= 'search_tool', db = db)
+
+        # Close database session
+        db.close()
+        
+        # Just return the content string
+        return {"answer": response.data, "sources": sources}
         
  
 

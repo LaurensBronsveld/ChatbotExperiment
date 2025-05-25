@@ -1,0 +1,14 @@
+{
+  "num_questions_evaluated": 1,
+  "retrieval_metrics": {
+    "success_rate": 0.0,
+    "avg_precision": 0.5,
+    "avg_recall": 1.0,
+    "avg_f1": 0.6666666666666666
+  },
+  "answer_metrics": {},
+  "detailed_results": {
+    "retrieval": [
+      {
+        "question_id": 1,
+        "golden_sources": 

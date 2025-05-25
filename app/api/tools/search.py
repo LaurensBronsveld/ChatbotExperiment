@@ -226,7 +226,7 @@ def search_database(request: SearchRequest):
                 
                 chunk_dict = {
                     "id": id,
-                    "source_url": chunk.document.location,
+                    "source": chunk.document.location,
                     "chunk": chunk.chunk,
                     "relevance_score": item.relevance_score
                 }

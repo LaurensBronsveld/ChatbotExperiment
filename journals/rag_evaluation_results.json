@@ -1,0 +1,17 @@
+{
+  "num_questions_evaluated": 0,
+  "retrieval_metrics": {
+    "success_rate": 0,
+    "avg_precision": 0,
+    "avg_recall": 0,
+    "avg_f1": 0
+  },
+  "answer_metrics": {
+    "avg_semantic_similarity": 0.0,
+    "avg_lexical_overlap": 0
+  },
+  "detailed_results": {
+    "retrieval": [],
+    "answers": []
+  }
+}

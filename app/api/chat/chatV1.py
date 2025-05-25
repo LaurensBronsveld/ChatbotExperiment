@@ -4,13 +4,13 @@ from fastapi.responses import StreamingResponse
 import uvicorn
 from uuid import uuid4, UUID
 
-from app.agents.agent import Assistant
-from app.agents.BaseAgent import BaseAgent
+
 from app.components.DatabaseManager import get_session
 from app.api.chat.history import create_conversation
 from app.models.models import *
 from app.models.SQL_models import ConversationType, Conversation, ChatRole, ChatMessage
 from sqlalchemy import select
+from app.agents.BaseAgent import BaseAgent
 import sys
 import os
 import logging

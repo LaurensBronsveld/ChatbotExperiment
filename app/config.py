@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     LANGFUSE_PUBLIC_KEY: str
     LANGFUSE_SECRET_KEY: str
     COHERE_API_KEY: str
-    # DATABASE_URL: str           # not used yet
+
     DATABASE_LOCATION: str = "postgresql+psycopg://postgres:password@localhost:5432/handbook_db"
     TEST_DATABASE_URL: str = "postgresql+psycopg://postgres:password@localhost:5432/test_db"
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"

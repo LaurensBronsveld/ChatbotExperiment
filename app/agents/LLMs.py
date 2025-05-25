@@ -8,10 +8,10 @@ from app.config import settings
 
 def get_model():
     if settings.LLM_PROVIDER.lower() == "open-ai":
-        return OpenAIModel(settings.LLM_MODEL, api_key=settings.OPENAI_API_KEY)
+        return OpenAIModel(settings.LLM_MODEL)
     elif settings.LLM_PROVIDER.lower() == "google":
-        return GeminiModel(settings.LLM_MODEL, api_key=settings.GOOGLE_API_KEY)
+        return GeminiModel(settings.LLM_MODEL)
     elif settings.LLM_PROVIDER.lower() == "anthropic":
-        return AnthropicModel(settings.LLM_MODEL, api_key=settings.ANTHROPIC_API_KEY)
+        return AnthropicModel(settings.LLM_MODEL)
     
 

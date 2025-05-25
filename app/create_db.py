@@ -5,7 +5,7 @@ from app.components.TextChunker import TextChunker
 from app.components.HandbookTextChunker import HandbookTextChunker
 
 def create_database(mode: str = "append"):
-    data_path = "data/handbook-main-content"
+    data_path = "data/HRM"
 
     if mode.lower() == "create":
         recreate_tables()
