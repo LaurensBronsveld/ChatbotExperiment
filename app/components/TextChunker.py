@@ -63,6 +63,7 @@ class TextChunker:
 
         for root, dirs, files in os.walk(self.data_path):
             for file in files:
+                print(file)
                 file_path = os.path.join(root, file)
                 title, file_extension = os.path.splitext(file)  # Get the file extension
                 if file_extension.lower() in allowed_extensions:  # Check if extension is allowed

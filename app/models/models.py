@@ -58,6 +58,7 @@ class ResponseModel(BaseModel):
     able_to_answer: Optional[bool] = Field(description="Indicates whether the LLM was able to generate a confident answer.", default=None)
     question_classification: Optional[str] = Field(description="The category or classification of the question.", default=None)
     follow_up_questions: Optional[list[str]] = Field(description="Suggested follow-up questions for the user.", default=None)
+    sources: Optional[list[SourceDict]]
 
 class ResponseMetadata(BaseModel):
     sources: list[SourceDict] = Field(description="List of sources referenced by the LLM to answer the question.")

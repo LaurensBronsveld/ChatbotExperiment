@@ -15,3 +15,6 @@ If you want to use streamlit to test the API server:
 
 1. install dependencies: uv pip install -r frontend/pyproject.toml
 2. start Streamlit: streamlit run frontend/main.py
+
+
+python -m app/scripts/run_chunker      

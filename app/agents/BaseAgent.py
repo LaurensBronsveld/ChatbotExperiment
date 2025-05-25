@@ -141,20 +141,21 @@ class BaseAgent():
         for source in content:
             url = source["source"]
             id = source["id"]
-            if url in seen_urls:
-                continue
+            text = source["chunk"]
+            # if url in seen_urls:
+            #     continue
             
-            # add url to set
-            seen_urls.add(url)
+            # # add url to set
+            # seen_urls.add(url)
 
             url_regex = r"^(https?:\/\/|www\.)\S+$"   # regex which matches most urls starting with http(s)// or www.
             uri_regex = r"^(?:[a-zA-Z]:\\|\/)[^\s]*$" # regex which matches absolute file paths in windows and unix systems
             # check type of source (rough implementation, probably better to do this while building database)
            
             if re.match(url_regex, url):
-                sources.append(SourceDict(id = id, type = 'url', url=url, used=False))
+                sources.append(SourceDict(id = id, type = 'url', url=url, used=False, text=text))
             elif re.match(uri_regex, url):
-                sources.append(SourceDict(id = id, type = 'file', uri=url, used=False))
+                sources.append(SourceDict(id = id, type = 'file', uri=url, used=False), text=text)
             else:
                 sources.append(SourceDict(id = id, type = 'snippet', text="some text", used=False))
         
