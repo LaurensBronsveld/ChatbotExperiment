@@ -207,19 +207,6 @@ def search_database(request: SearchRequest):
                 print(result)
                 break
             chunks = [result["chunk"] for result in results]
-            # query_embedding = openai.embeddings.create(
-            #     input = query,
-            #     model=settings.EMBED_MODEL
-            # ).data[0].embedding
-
-            # query_vector = np.array(query_embedding).tolist()
-            
-            # results = (
-            #     db.query(Chunk)
-            #     .order_by(Chunk.embedding.l2_distance(query_vector))  # L2 distance for similarity
-            #     .limit(100)
-            #     .all()
-            # )
 
             #get list of strings to rerank with Cohere
             for chunk in chunks:
