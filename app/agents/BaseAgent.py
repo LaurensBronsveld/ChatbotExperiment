@@ -330,27 +330,3 @@ class BaseAgent():
         return {"answer": response.data, "sources": sources}
         
  
-
-# db_manager = DatabaseManager()
-# assistant = Assistant(db_manager, 'nl')
-
-# def main():
-#     request = {"metadata": {"language": "nl",
-#                         "session_id": "",
-#                         "tools": [{ "name": "HR", "enabled": True }]
-#                     }, 
-#                     "user": {
-#                         "question": "What is GitLab's approach to paid time off (PTO)",
-#                         "context": [
-#                             { "type": "file", "URL": "" }, 
-#                             { "type": "snippet", "text": ""},
-#                             { "type": "url", "url": "https://example.com" }
-#                         ]
-#                     }
-#                     }
-#     response = assistant.generate_response(request)
-#     print(response)
-
-
-# if __name__ == "__main__":
-#     main()

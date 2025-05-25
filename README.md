@@ -17,4 +17,9 @@ If you want to use streamlit to test the API server:
 2. start Streamlit: streamlit run frontend/main.py
 
 
-python -m app/scripts/run_chunker      
+To build the RAG database run this command:
+    python -m app/scripts/create_db.py     
+requires gitlab handbook files from: https://gitlab.com/gitlab-com/content-sites/handbook/-/tree/main/content stored in data folder in root directory.
+
+To run the evaluation pipeline run this command:
+    python -m app/scripts/evaluate_answer

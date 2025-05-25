@@ -62,13 +62,3 @@ class JudgeAgent:
         result = agent.run_sync(query)
         return result
 
-    # def batch_evaluate(self, evaluation_data: List[Dict]) -> List[ResponseEvaluation]:
-    #     results = []
-    #     for item in evaluation_data:
-    #         result = self.evaluate_response(
-    #             item["question"],
-    #             item["rag_response"],
-    #             item["golden_answer"]
-    #         )
-    #         results.append(result)
-    #     return results

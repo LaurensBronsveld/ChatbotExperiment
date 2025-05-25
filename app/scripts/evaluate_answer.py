@@ -4,10 +4,9 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.tests.example_requests import *
 from app.models.models import *
-import json
+
 from httpx import AsyncClient
-import pytest
-import logging
+
 from app.config import settings
 from app.agents.LLMs import get_model
 from pydantic_ai.models.gemini import GeminiModel
