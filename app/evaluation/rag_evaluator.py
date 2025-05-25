@@ -348,33 +348,3 @@ class RagEvaluator:
         result_df.to_csv(output_path, index=False, encoding="utf-8")
 
         logger.info(f"Saved CSV to {output_path}")
-
-    # def save_results(self, output_path, evaluation_results):
-    #     with open(output_path, "w", newline='', encoding="utf-8") as f:
-    #         writer = csv.writer(f)
-    #         writer.writerow([
-    #             "Question ID", "Question", "Golden Answer", "Generated Answer",
-    #             "Golden Sources", "Retrieved Sources", "Precision", "Recall", "F1 Score","Judge Score", "Judge Evaluation"
-    #         ])
-
-    #         retrieval_results = evaluation_results["detailed_results"]["retrieval"]
-    #         answer_results = evaluation_results["detailed_results"]["answers"]
-
-    #         for i in range(len(retrieval_results)):
-    #             r = retrieval_results[i]
-    #             a = answer_results[i]
-    #             writer.writerow([
-    #                 r.get("question_id", "N/A"),
-    #                 a.get("question", "N/A"),
-    #                 a.get("golden_answer", "N/A"),
-    #                 a.get("generated_answer", "N/A"),
-    #                 ", ".join(r.get("golden_sources", [])),
-    #                 ", ".join(r.get("retrieved_sources", [])),
-    #                 r.get("precision", 0),
-    #                 r.get("recall", 0),
-    #                 r.get("f1_score", 0),
-    #                 a.get("judge_score", 0),
-    #                 a.get("judge_evaluation", "N/A")
-    #             ])
-
-    #     print(f"Evaluation results saved as CSV to {output_path}")

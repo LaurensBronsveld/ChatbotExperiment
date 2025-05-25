@@ -25,6 +25,12 @@ router = APIRouter()
 
 @router.post("/conversation/")
 async def create_conversation(request: ConversationModel):
+    """
+    Creates a new conversation record in the database.
+
+    Args:
+        request (ConversationModel): The Pydantic model containing conversation details.
+    """
     try:
         # get session
         db_generator = get_session()
@@ -51,7 +57,15 @@ async def create_conversation(request: ConversationModel):
 
 
 @router.get("/conversation/")
-async def get_all_conversations() -> ConversationModel:
+async def get_all_conversations() -> list[ConversationModel]:
+    """
+    Retrieves all conversations from the database.
+
+    Returns:
+        list: A list of Pydantic ConversationModel objects.
+              Returns an empty list if no conversations are found.
+
+    """
     conversations = []
     try:
         # get session
@@ -80,6 +94,18 @@ async def get_all_conversations() -> ConversationModel:
 
 @router.get("/conversation/{session_id}/")
 async def get_conversation(session_id: UUID):
+    """
+    Retrieves a specific conversation by its session_id.
+
+    Args:
+        session_id (UUID): The unique identifier for the conversation.
+
+    Returns:
+        ConversationModel: The conversation details as a Pydantic model if found.
+                           If the conversation is not found (e.g., due to .one()),
+                           or an error occurs during processing or database interaction,
+                           an exception will likely be raised and logged.
+    """
     try:
         # get session
         db_generator = get_session()
@@ -108,6 +134,19 @@ async def get_conversation(session_id: UUID):
 
 @router.get("/history/{session_id}/")
 def get_history(session_id: UUID, show_system_calls: bool = False):
+    """
+    Retrieves the chat history for a given session_id.
+
+    Args:
+        session_id (UUID): The unique identifier for the conversation session.
+        show_system_calls (bool, optional): Whether to include system messages in the history.
+                                           Defaults to False.
+
+    Returns:
+        ChatHistoryModel: The chat history including metadata and messages if found.
+        str: An error message string if the session does not exist or an
+             exception occurs during processing.
+    """
     try:
         # get db session
         db_generator = get_session()

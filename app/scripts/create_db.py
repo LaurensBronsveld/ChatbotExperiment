@@ -1,10 +1,27 @@
 import sys
 from app.components.DatabaseManager import get_session, recreate_tables
 from app.components.HandbookTextChunker import HandbookTextChunker
+from app.config import settings
 
 
 def create_database(mode: str = "append"):
-    data_path = "data/HRM"
+    """
+    Initializes or updates the database with data from the specified data_path.
+
+    This function can operate in two modes:
+    - "create": Drops all existing tables and recreates them before processing data.
+    - "append": Adds new data to the existing database tables.
+
+    It uses the HandbookTextChunker to process files from the data folder,
+    which handles text extraction, chunking, embedding, and database insertion
+    within its context manager.
+
+    Args:
+        mode (str, optional): The mode of operation. Can be "create" or "append".
+                              Defaults to "append". If an invalid mode is provided,
+                              the script will exit.
+    """
+    data_path = settings.DATA_PATH
 
     if mode.lower() == "create":
         recreate_tables()

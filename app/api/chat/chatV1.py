@@ -24,6 +24,15 @@ router = APIRouter()
 
 
 def get_assistant(request: RequestModel):
+    """
+    Initializes and returns a BaseAgent based on the language specified in the request metadata.
+
+    Args:
+        request (RequestModel): The request model containing metadata with language information.
+
+    Returns:
+        BaseAgent: An instance of the BaseAgent configured for the specified language.
+    """
     language = request.metadata["language"]
 
     return BaseAgent(language)
@@ -75,9 +84,9 @@ async def get_response(
     request: RequestModel, agent: BaseAgent = Depends(get_assistant)
 ):
     """
-    Creates a new conversation and generates a chat response from the agent.
-    Posts the new conversation to the database
-    Returns a streaming response with the chatbot response and other metadata defined in the responsedict class.
+    Creates a new conversation and generates a non-streaming chat response from the agent.
+    This is a simplified version of the chat endpoint for testing purposes.
+    Returns a response with the chatbot response and other metadata defined in the responsedict class.
     """
 
     # create new conversation
@@ -101,8 +110,8 @@ async def get_follow_up_response(
     request: RequestModel, session_id: UUID, agent: BaseAgent = Depends(get_assistant)
 ):
     """
-    Generate a follow up response to an existing conversation.
-    Returns a streaming response with the chatbot response and other metadata defined in the responsedict class.
+    Generate a follow up response to an existing test conversation.
+    Returns a  response with the chatbot response and other metadata defined in the responsedict class.
     """
 
     response = await agent.generate_response(request=request, session_id=session_id)

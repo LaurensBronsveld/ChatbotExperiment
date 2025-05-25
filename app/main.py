@@ -7,7 +7,6 @@ from app.api import api_router
 main_router = APIRouter()
 
 # setup
-DATABASE_LOCATION = "./data/lancedb"
 app = FastAPI(title="GitLab Handbook Chatbot")
 
 app.include_router(main_router)

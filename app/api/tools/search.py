@@ -123,12 +123,14 @@ def hybrid_search(
 ):
     """
     Performs a hybrid search combining dense and sparse retrieval methods.
-
-    :param query: Search query
-    :param dense_comparator: Similarity metric for dense search
-    :param alpha: Weight for combining scores (0.5 means equal weight to both)
-    :param n: Number of top results to return
-    :return: List of combined search results
+    Args:
+        query: Search query
+        dense_comparator: Similarity metric for dense search
+        alpha: Weight for combining scores (0.5 means equal weight to both)
+        n: Number of top results to return
+        
+    Returns: 
+        List of combined search results
     """
 
     # Perform both searches
@@ -259,11 +261,3 @@ def search_database(request: SearchRequest):
         logging.error({"error during search_database": str(e)})
     finally:
         db.close()
-
-
-def main():
-    dense_search("test", next(get_session()))
-
-
-if __name__ == "__main__":
-    main()

@@ -12,14 +12,24 @@ from app.evaluation.rag_evaluator import RagEvaluator
 API_URL = "/api"
 
 
-client = TestClient(app)
-
-
 def evaluate_RAG_response(golden_testset_path: str, output_path: str):
-    """ """
-    # GOLDEN_TEST_PATH = "data/gitlab_rag_golden_testset.csv"
+    """
+    Evaluates the RAG system's responses against a golden test set.
+
+    This function reads a golden test set, generates answers for each question
+    using the BaseAgent, evaluates these answers and the retrieved sources using
+    the RagEvaluator, saves the detailed results, and prints a summary
+    of the evaluation metrics.
+
+    Args:
+        golden_testset_path (str): The file path to the golden test set (CSV format).
+        output_path (str): The file path where the evaluation results (CSV format) will be saved.
+
+    Returns:
+        dict: A dictionary containing the aggregated evaluation metrics and detailed results.
+              Returns None if an exception occurs during response generation early in the process.
+    """
     rag_evaluator = RagEvaluator(golden_testset_path)
-    judge_agent = JudgeAgent()
     assistant = BaseAgent()
 
     df = pd.read_csv(GOLDEN_TEST_PATH, delimiter=",")
@@ -74,7 +84,6 @@ def evaluate_RAG_response(golden_testset_path: str, output_path: str):
 
 
 if __name__ == "__main__":
-    # GOLDEN_TEST_PATH = "data/gitlab-handbook-golden-test-set.csv"
     GOLDEN_TEST_PATH = "data/gitlab_rag_golden_testset.csv"
     RESULT_PATH = "data/gitlab_golden_testset_evaluation.csv"
     evaluate_RAG_response(GOLDEN_TEST_PATH, RESULT_PATH)

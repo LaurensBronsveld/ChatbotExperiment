@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "open-AI"
     LLM_MODEL: str = "gpt-4o"
     EMBED_MODEL: str = "text-embedding-3-small"
+    DATA_PATH: str = "data/handbook-main-content"
 
     model_config = ConfigDict(
         env_file=".env",

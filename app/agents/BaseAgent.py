@@ -2,6 +2,7 @@ from __future__ import annotations as _annotations
 
 import httpx
 import re
+from typing import Any
 from pydantic import ValidationError
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ToolReturnPart
@@ -39,10 +40,28 @@ langfuse = Langfuse(
 
 class BaseAgent:
     def __init__(self, language: str = "en"):
+        """
+        Initializes the BaseAgent.
+
+        Args:
+            language (str, optional): The language for the agent's responses.
+                                      Defaults to "en" (English).
+        """
         self.language = language
         self.tools = []
 
     def get_chat_history(self, session_id: str):
+        """
+        Retrieves the chat history for a given session ID.
+
+        Args:
+            session_id (str): The unique identifier for the chat session.
+
+        Returns:
+            list[dict] | None: A list of message dictionaries if history is found,
+                               each with "role" and "content". Returns None if
+                               no history is found or an error occurs.
+        """
         try:
             history = []
             results = get_history(session_id=session_id, show_system_calls=True)
@@ -57,14 +76,20 @@ class BaseAgent:
                 return None
         except Exception as e:
             logging.error(f"error retrieving chat history: {e}")
+            return None 
 
     def update_chat_history(self, db: object, session_id: UUID, message: MessageModel):
-        try:
-            # check if session with given session_id exists
+        """
+        Updates the chat history in the database with a new message.
 
+        Args:
+            db (object): The SQLAlchemy database session object.
+            session_id (UUID): The unique identifier for the chat session.
+            message (MessageModel): The Pydantic message model to add to the history.
+        """
+        try:
             # add new message to database
-            # for now it is assumed that the message matches the langauge of the assistant
-            # we might detect this manually in the future
+
             new_chat_message = ChatMessage(
                 session_id=session_id,
                 role=message.role,
@@ -83,15 +108,20 @@ class BaseAgent:
         Searches the handbook database using the provided query for relevant chunks of information.
 
         This method performs a vector search on the database containing embedded chunks of the Gitlab Handbook.
-        It returns the top X matching results from the database in the form of a JSON list of dictionaries with ID, source and content
+        It returns the top X matching results from the database in the form of a JSON list of dictionaries with ID, source and content.
+
         Args:
             ctx (RunContext): The context of the current run, providing access to dependencies and state.
             query (str): The search query to use against the handbook database.
-            tool_call_attempt (int): The attempt number of the tool call, used to generate unique IDs for results. First attempt is 0.
+            tool_call_attempt (int, optional): The attempt number of the tool call, used to generate unique IDs for results.
+                                               First attempt is 0. Defaults to 0.
+            limit (int, optional): The maximum number of search results to return from the reranker.
+                                   Defaults to 5.
 
         Returns:
             list[dict] or dict: A list of dictionaries, where each dictionary represents a search result
-                            containing the 'id', 'source', and 'chunk'.
+                            containing the 'id', 'source', and 'chunk'. Returns an empty list or
+                            error dictionary if search fails.
         """
         # create search request
         request = SearchRequest(
@@ -106,10 +136,28 @@ class BaseAgent:
     def get_tool_results(
         self, ctx: RunContext, result: object, tool_name: str, db, session_id=None
     ):
+        """
+        Extracts and processes results from a tool call.
+
+        Parses the tool return parts from the agent's result object, updates
+        chat history with system messages about tool usage, and formats
+        the tool content into a list of SourceDict objects.
+
+        Args:
+            ctx (RunContext): The context of the current run. (Niet direct gebruikt in de body)
+            result (object): The result object from an agent run, expected to contain messages.
+            tool_name (str): The name of the tool whose results are to be extracted.
+            db (object): The SQLAlchemy database session object for updating history.
+            session_id (UUID, optional): The session ID for updating chat history. Defaults to None.
+
+        Returns:
+            tuple[list[SourceDict], list[str]]: A tuple containing:
+                - A list of SourceDict objects representing the formatted tool results.
+                - A list of tool names that were called.
+        """
         content = []
         sources = []
         tools = []
-        seen_urls = set()
 
         # get resuls from tool call out of Result object
         for message in result.all_messages():
@@ -127,26 +175,21 @@ class BaseAgent:
                         self.update_chat_history(db, session_id, system_message)
 
         # create source objects
-        for source in content:
-            url = source["source"]
-            id = source["id"]
-            text = source["chunk"]
-            # if url in seen_urls:
-            #     continue
+        for source_item in content: 
+            url = source_item["source"]
+            id_val = source_item["id"]
+            text = source_item["chunk"]
 
-            # # add url to set
-            # seen_urls.add(url)
 
             url_regex = r"^(https?:\/\/|www\.)\S+$"  # regex which matches most urls starting with http(s)// or www.
             uri_regex = r"^(?:[a-zA-Z]:\\|\/)[^\s]*$"  # regex which matches absolute file paths in windows and unix systems
-            # check type of source (rough implementation, probably better to do this while building database)
 
             if re.match(url_regex, url):
-                sources.append(SourceDict(id=id, type="url", url=url, text=text))
+                sources.append(SourceDict(id=id_val, type="url", url=url, text=text))
             elif re.match(uri_regex, url):
-                sources.append(SourceDict(id=id, type="file", uri=url, text=text))
+                sources.append(SourceDict(id=id_val, type="file", uri=url, text=text))
             else:
-                sources.append(SourceDict(id=id, type="snippet", text=text))
+                sources.append(SourceDict(id=id_val, type="snippet", text=text))
 
         return sources, tools
 
@@ -157,6 +200,23 @@ class BaseAgent:
         name="chatbot response",
     )
     async def process_answer(self, prompt: list, session_id: str, db):
+        """
+        Processes a user prompt, generates a response using an LLM agent with a search tool,
+        and streams the response.
+
+        This asynchronous generator initializes an agent, retrieves chat history,
+        runs the agent with the history and prompt, processes tool calls (search),
+        and yields metadata and structured response chunks. It also updates the
+        chat history with the assistant's final response.
+
+        Args:
+            prompt (list): The user's input/prompt. 
+            session_id (str): The unique identifier for the chat session.
+            db (object): The SQLAlchemy database session object.
+
+        Yields:
+            str: JSON serialized strings of ResponseMetadata and ResponseModel chunks.
+        """
         response = None
         old_content = ""
 
@@ -174,7 +234,7 @@ class BaseAgent:
 
         async with agent.run_stream(str(history)) as result:
             sources, tools_used = self.get_tool_results(
-                self,
+                self, 
                 result=result,
                 tool_name="search_tool",
                 db=db,
@@ -234,6 +294,21 @@ class BaseAgent:
     async def generate_response_stream(
         self, request: RequestModel, session_id: UUID = None
     ):
+        """
+        Generates a streaming response for a chat request.
+
+        Initializes a database session, sets up Langfuse tracing, updates chat history
+        with the user's message, and then processes the answer using `process_answer`
+        to yield response chunks.
+
+        Args:
+            request (RequestModel): The user's request containing the question and context.
+            session_id (UUID, optional): The unique identifier for the chat session.
+                                         Defaults to None (hoewel de logica het vereist).
+
+        Yields:
+            str: JSON serialized chunks of the response stream.
+        """
         # get database session
         db_generator = get_session()
         db = next(db_generator)
@@ -262,7 +337,7 @@ class BaseAgent:
                         yield chunk
                 break
             except Exception as e:
-                if attempt < retries - 1:
+                if attempt < retries - 1: 
                     logging.error(
                         f"Error: {e} occured while streaming response, repeating attempt"
                     )
@@ -273,10 +348,25 @@ class BaseAgent:
                     )
                     db.rollback()  # rollback changes to the database
 
-        # commit and close database session
+        # close database session
         db.close()
 
     async def generate_response(self, session_id, request: RequestModel):
+        """
+        Generates a non-streaming (complete) response for a chat request.
+
+        Initializes a database session, updates chat history, runs the agent to get a full response,
+        updates history with the assistant's response, processes tool results, and returns
+        the metadata and response.
+
+        Args:
+            session_id (UUID): The unique identifier for the chat session.
+                               (Type hint ontbreekt in method signature)
+            request (RequestModel): The user's request containing the question and context.
+
+        Returns:
+            dict: A dictionary containing "metadata" and "response" JSON strings.
+        """
         # get database session
         db_generator = get_session()
         db = next(db_generator)
@@ -309,9 +399,9 @@ class BaseAgent:
         self.update_chat_history(db, session_id, assistant_message)
 
         sources, tools_used = self.get_tool_results(
-            self,
+            self, 
             result=response,
-            tool_name="use_search_tool",
+            tool_name="use_search_tool", 
             db=db,
             session_id=session_id,
         )
@@ -329,7 +419,22 @@ class BaseAgent:
         response_json = response.data.model_dump_json()
         return {"metadata": metadata_json, "response": response_json}
 
-    def generate_simple_response(self, request: str) -> str:
+    def generate_simple_response(self, request: str) -> dict[str, Any]:
+        """
+        Generates a simple, non-streaming response for a given request string.
+
+        Initializes a database session, sets up an agent with a search tool,
+        runs the agent synchronously, processes tool results, and returns
+        the answer and sources.
+
+     
+
+        Args:
+            request (str): The user's request string.
+
+        Returns:
+            dict: A dictionary containing "answer" (ResponseModel data) and "sources" (list of SourceDict).
+        """
         # Get database session
         db_generator = get_session()
         db = next(db_generator)
@@ -340,8 +445,11 @@ class BaseAgent:
         agent.tool(self.search_tool)
 
         response = agent.run_sync(request)
-        sources, tools_used = self.get_tool_results(
-            self, result=response, tool_name="search_tool", db=db
+        sources, tools_used = self.get_tool_results( 
+            self, 
+            result=response,
+            tool_name="search_tool",
+            db=db
         )
 
         # Close database session
