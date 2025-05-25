@@ -1,43 +1,44 @@
 languages = {
-    'ar': 'Arabic',
-    'bg': 'Bulgarian',
-    'ca': 'Catalan',
-    'zh': 'Chinese',
-    'hr': 'Croatian',
-    'cs': 'Czech',
-    'da': 'Danish',
-    'nl': 'Dutch',
-    'en': 'English',
-    'et': 'Estonian',
-    'fi': 'Finnish',
-    'fr': 'French',
-    'de': 'German',
-    'el': 'Greek',
-    'he': 'Hebrew',
-    'hi': 'Hindi',
-    'hu': 'Hungarian',
-    'id': 'Indonesian',
-    'it': 'Italian',
-    'ja': 'Japanese',
-    'ko': 'Korean',
-    'lv': 'Latvian',
-    'lt': 'Lithuanian',
-    'ms': 'Malay',
-    'no': 'Norwegian',
-    'pl': 'Polish',
-    'pt': 'Portuguese',
-    'ro': 'Romanian',
-    'ru': 'Russian',
-    'sr': 'Serbian',
-    'sk': 'Slovak',
-    'sl': 'Slovenian',
-    'es': 'Spanish',
-    'sv': 'Swedish',
-    'th': 'Thai',
-    'tr': 'Turkish',
-    'uk': 'Ukrainian',
-    'vi': 'Vietnamese'
+    "ar": "Arabic",
+    "bg": "Bulgarian",
+    "ca": "Catalan",
+    "zh": "Chinese",
+    "hr": "Croatian",
+    "cs": "Czech",
+    "da": "Danish",
+    "nl": "Dutch",
+    "en": "English",
+    "et": "Estonian",
+    "fi": "Finnish",
+    "fr": "French",
+    "de": "German",
+    "el": "Greek",
+    "he": "Hebrew",
+    "hi": "Hindi",
+    "hu": "Hungarian",
+    "id": "Indonesian",
+    "it": "Italian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "lv": "Latvian",
+    "lt": "Lithuanian",
+    "ms": "Malay",
+    "no": "Norwegian",
+    "pl": "Polish",
+    "pt": "Portuguese",
+    "ro": "Romanian",
+    "ru": "Russian",
+    "sr": "Serbian",
+    "sk": "Slovak",
+    "sl": "Slovenian",
+    "es": "Spanish",
+    "sv": "Swedish",
+    "th": "Thai",
+    "tr": "Turkish",
+    "uk": "Ukrainian",
+    "vi": "Vietnamese",
 }
+
 
 def get_chatbot_prompt(language: str):
     prompt = f"""
@@ -75,10 +76,10 @@ def get_chatbot_prompt(language: str):
                 query: The query to search for. You should try to use relevant keywords and when possible translate the query to english because the documents are in english.
                 tool_call_attempt: This keeps track of how often the search tool has been called to id the retrieved sources. This should be 0 on your first call, and incremented by 1 every time you reuse it.
         """
-    
+
     return prompt
-                        
-                        
+
+
 def get_judge_prompt():
     prompt = """You are an expert evaluator of RAG systems that answer questions about company data.
     
@@ -113,6 +114,7 @@ def get_judge_prompt():
 
         You MUST be strict in scoring - if the AI-generated answer doesn't match the golden answer content exactly, it should receive correspondingly lower scores."""
     return prompt
+
 
 def get_judge_prompt2():
     prompt = """

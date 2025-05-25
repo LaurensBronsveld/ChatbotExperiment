@@ -1,8 +1,7 @@
 import sys
-from app.config import settings
 from app.components.DatabaseManager import get_session, recreate_tables
-from app.components.TextChunker import TextChunker
 from app.components.HandbookTextChunker import HandbookTextChunker
+
 
 def create_database(mode: str = "append"):
     data_path = "data/HRM"
@@ -17,7 +16,9 @@ def create_database(mode: str = "append"):
         sys.exit(1)
 
     # go through data pipeline
-    with HandbookTextChunker(data_path= data_path, get_session_func=get_session) as chunker:
+    with HandbookTextChunker(
+        data_path=data_path, get_session_func=get_session
+    ) as chunker:
         pass
 
 

@@ -1,22 +1,16 @@
 import pandas as pd
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
 import re
-import csv
-import json
-from typing import Any, Optional
-import os
-import openpyxl
+from typing import Any
 
-from app.agents.Judge import JudgeAgent, JudgeInput, ResponseEvaluation, CriterionScore
+from app.agents.Judge import JudgeAgent, JudgeInput
 from app.agents.BaseAgent import BaseAgent
+
 
 class RagEvaluator:
     def __init__(self, golden_test_set_path: str):
         """
         Initialize the RAG evaluation system
-        
+
         Args:
             golden_test_set_path: Path to the CSV file containing the golden test set
             model_name: The sentence transformer model to use for semantic similarity
@@ -25,49 +19,53 @@ class RagEvaluator:
         self.golden_df = self._load_golden_test_set()
         self.assistant = BaseAgent()
         self.judge = JudgeAgent()
-        
+
     def _load_golden_test_set(self) -> pd.DataFrame:
         """Load the golden test set from CSV"""
         try:
             # Try reading with common encodings
-            for encoding in ['utf-8', 'latin-1', 'ISO-8859-1']:
+            for encoding in ["utf-8", "latin-1", "ISO-8859-1"]:
                 try:
-                    df = pd.read_csv(self.golden_test_set_path, encoding=encoding, delimiter=',')
+                    df = pd.read_csv(
+                        self.golden_test_set_path, encoding=encoding, delimiter=","
+                    )
                     return df
                 except UnicodeDecodeError:
                     continue
-                    
+
             # If all encodings fail, try excel format
             return pd.read_excel(self.golden_test_set_path)
-            
+
         except Exception as e:
             print(f"Error loading golden test set: {e}")
             # Create empty DataFrame with expected columns if loading fails
             return pd.DataFrame(columns=["id", "question", "answer", "source"])
-    
+
     def _normalize_path(self, path: str) -> str:
         """Normalize file paths for comparison"""
         # Remove leading/trailing whitespace, normalize slashes
         path = path.strip()
-        path = path.replace('\\', '/')
-        
+        path = path.replace("\\", "/")
+
         # Remove leading "/" if present
-        if path.startswith('/'):
+        if path.startswith("/"):
             path = path[1:]
-            
+
         # Handle cases where the path might be in a different format
-        path = re.sub(r'^.*?content/', 'content/', path)
-        
+        path = re.sub(r"^.*?content/", "content/", path)
+
         return path.lower()
-    
-    def evaluate_retrieval(self, question_id: int, retrieved_sources: list[str]) -> dict[str, Any]:
+
+    def evaluate_retrieval(
+        self, question_id: int, retrieved_sources: list[str]
+    ) -> dict[str, Any]:
         """
         Evaluate if the retrieved sources match the expected sources for a question
-        
+
         Args:
             question_id: The ID of the question to evaluate
             retrieved_sources: List of source paths retrieved by the RAG system
-            
+
         Returns:
             Dictionary with evaluation metrics
         """
@@ -75,37 +73,55 @@ class RagEvaluator:
         question_row = self.golden_df[self.golden_df["id"] == question_id]
         if question_row.empty:
             return {"error": f"Question ID {question_id} not found in golden test set"}
-        
+
         golden_sources = question_row["source"].iloc[0]
-        golden_sources_norm = set([self._normalize_path(src.strip()) for src in golden_sources.split(',')])
-        
+        golden_sources_norm = set(
+            [self._normalize_path(src.strip()) for src in golden_sources.split(",")]
+        )
+
         # Normalize retrieved sources
-        retrieved_sources_norm = set([self._normalize_path(src) for src in retrieved_sources])
-        
+        retrieved_sources_norm = set(
+            [self._normalize_path(src) for src in retrieved_sources]
+        )
+
         true_positives = len(golden_sources_norm & retrieved_sources_norm)
         false_positives = len(retrieved_sources_norm - golden_sources_norm)
         false_negatives = len(golden_sources_norm - retrieved_sources_norm)
-        
-        precision = true_positives / (true_positives + false_positives) if retrieved_sources_norm else 0.0
-        recall = true_positives / (true_positives + false_negatives) if golden_sources_norm else 0.0
-        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+
+        precision = (
+            true_positives / (true_positives + false_positives)
+            if retrieved_sources_norm
+            else 0.0
+        )
+        recall = (
+            true_positives / (true_positives + false_negatives)
+            if golden_sources_norm
+            else 0.0
+        )
+        f1 = (
+            2 * precision * recall / (precision + recall)
+            if (precision + recall)
+            else 0.0
+        )
         return {
             "question_id": question_id,
             "golden_sources": golden_sources_norm,
             "retrieved_sources": retrieved_sources_norm,
             "precision": precision,
             "recall": recall,
-            "f1_score": f1
+            "f1_score": f1,
         }
 
-    def evaluate_answer(self, question_id: int, generated_answer: str, retrieved_texts: list[str]) -> dict[str, Any]:
+    def evaluate_answer(
+        self, question_id: int, generated_answer: str, retrieved_texts: list[str]
+    ) -> dict[str, Any]:
         """
         Evaluate the quality of a generated answer against the golden answer
-        
+
         Args:
             question_id: The ID of the question to evaluate
             generated_answer: The answer generated by the RAG system
-            
+
         Returns:
             Dictionary with evaluation metrics
         """
@@ -113,7 +129,7 @@ class RagEvaluator:
         question_row = self.golden_df[self.golden_df["id"] == question_id]
         if question_row.empty:
             return {"error": f"Question ID {question_id} not found in golden test set"}
-        
+
         golden_answer = question_row["answer"].iloc[0]
         question = question_row["question"].iloc[0]
 
@@ -121,7 +137,7 @@ class RagEvaluator:
             question=question,
             golden_answer=golden_answer,
             llm_answer=generated_answer,
-            source_documents=retrieved_texts
+            source_documents=retrieved_texts,
         )
 
         try:
@@ -129,18 +145,22 @@ class RagEvaluator:
         except Exception as e:
             print(e)
             return
-        else:       
-            print(f"Judge evaluation: \n score: {evaluation.data.score} \n explanation: {evaluation.data.summary}") 
+        else:
+            print(
+                f"Judge evaluation: \n score: {evaluation.data.score} \n explanation: {evaluation.data.summary}"
+            )
             return {
                 "question_id": question_id,
                 "question": question,
                 "golden_answer": golden_answer,
                 "generated_answer": generated_answer,
                 "judge_score": evaluation.data.score,
-                "judge_evaluation": evaluation.data.summary
+                "judge_evaluation": evaluation.data.summary,
             }
-    
-    async def generate_answers(self, db_factory: async_sessionmaker) -> list[dict[str, Any]]:
+
+    async def generate_answers(
+        self, db_factory: async_sessionmaker
+    ) -> list[dict[str, Any]]:
         """
         Generate answers for all questions in the golden test set
 
@@ -152,14 +172,17 @@ class RagEvaluator:
             question_id, retrieved_sources, retrieved_texts, and generated_answer
         """
 
-
         rag_results = []
         semaphore = asyncio.Semaphore(5)
 
-        async def process_question(db_factory: async_sessionmaker, question: str, question_id: int):
+        async def process_question(
+            db_factory: async_sessionmaker, question: str, question_id: int
+        ):
             async with semaphore:
                 async with db_factory() as db:
-                    response = await self.assistant.generate_simple_response(db, question)
+                    response = await self.assistant.generate_simple_response(
+                        db, question
+                    )
 
                 answer = response["answer"]
                 source_dicts = response["sources"]
@@ -180,7 +203,9 @@ class RagEvaluator:
             question_id = row["id"]
             question = row["question"]
 
-            task = asyncio.create_task(process_question(db_factory, question, question_id))
+            task = asyncio.create_task(
+                process_question(db_factory, question, question_id)
+            )
             tasks.append(task)
 
         # Wait for all tasks to complete
@@ -190,19 +215,19 @@ class RagEvaluator:
     def run_evaluation(self, rag_results: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Run a full evaluation on a batch of RAG results
-        
+
         Args:
             rag_results: List of dictionaries, each containing:
                 - question_id: The ID of the question
                 - retrieved_sources: List of source paths retrieved by the RAG
                 - generated_answer: The answer generated by the system
-                
+
         Returns:
             Dictionary with aggregated evaluation metrics
         """
         retrieval_results = []
         answer_results = []
-        
+
         for result in rag_results:
             question_id = result["question_id"]
             retrieved_sources = result.get("retrieved_sources", [])
@@ -211,38 +236,60 @@ class RagEvaluator:
 
             retrieval_eval = self.evaluate_retrieval(question_id, retrieved_sources)
             retrieval_results.append(retrieval_eval)
-            
-            answer_eval = self.evaluate_answer(question_id, generated_answer, retrieved_texts)
+
+            answer_eval = self.evaluate_answer(
+                question_id, generated_answer, retrieved_texts
+            )
             answer_results.append(answer_eval)
-        
+
         # Calculate aggregate metrics
-        retrieval_success_rate = sum(1 for r in retrieval_results if r.get("retrieval_success", False)) / len(retrieval_results) if retrieval_results else 0
-        avg_retrieval_precision = sum(r.get("precision", 0) for r in retrieval_results) / len(retrieval_results) if retrieval_results else 0
-        avg_retrieval_recall = sum(r.get("recall", 0) for r in retrieval_results) / len(retrieval_results) if retrieval_results else 0
-        avg_retrieval_f1 = sum(r.get("f1_score", 0) for r in retrieval_results) / len(retrieval_results) if retrieval_results else 0
-        avg_judge_score = sum(a.get("judge_score", 0) for a in answer_results) / len(answer_results) if answer_results else 0
-        
-       
+        retrieval_success_rate = (
+            sum(1 for r in retrieval_results if r.get("retrieval_success", False))
+            / len(retrieval_results)
+            if retrieval_results
+            else 0
+        )
+        avg_retrieval_precision = (
+            sum(r.get("precision", 0) for r in retrieval_results)
+            / len(retrieval_results)
+            if retrieval_results
+            else 0
+        )
+        avg_retrieval_recall = (
+            sum(r.get("recall", 0) for r in retrieval_results) / len(retrieval_results)
+            if retrieval_results
+            else 0
+        )
+        avg_retrieval_f1 = (
+            sum(r.get("f1_score", 0) for r in retrieval_results)
+            / len(retrieval_results)
+            if retrieval_results
+            else 0
+        )
+        avg_judge_score = (
+            sum(a.get("judge_score", 0) for a in answer_results) / len(answer_results)
+            if answer_results
+            else 0
+        )
+
         return {
             "num_questions_evaluated": len(rag_results),
             "retrieval_metrics": {
                 "success_rate": retrieval_success_rate,
                 "avg_precision": avg_retrieval_precision,
                 "avg_recall": avg_retrieval_recall,
-                "avg_f1": avg_retrieval_f1
+                "avg_f1": avg_retrieval_f1,
             },
-            "answer_metrics": {
-                "avg_judge_score": avg_judge_score
-            },
+            "answer_metrics": {"avg_judge_score": avg_judge_score},
             "detailed_results": {
                 "retrieval": retrieval_results,
-                "answers": answer_results
-            }
+                "answers": answer_results,
+            },
         }
-    
+
     def save_results(self, output_path, evaluation_results):
         retrieval_results = evaluation_results["detailed_results"]["retrieval"]
-        answer_results    = evaluation_results["detailed_results"]["answers"]
+        answer_results = evaluation_results["detailed_results"]["answers"]
 
         # Combine data with a list comprehension
         data = [
@@ -271,9 +318,11 @@ class RagEvaluator:
         print(f"Saved CSV to {output_path}")
         print(f"Saved Excel to {output_path.replace('.csv', '.xlsx')}")
 
-    def save_results(self, output_path: str, evaluation_results: RagEvaluationResult) -> None:
+    def save_results(
+        self, output_path: str, evaluation_results: RagEvaluationResult
+    ) -> None:
         retrieval_results = evaluation_results.detailed_results["retrieval"]
-        answer_results    = evaluation_results.detailed_results["answers"]
+        answer_results = evaluation_results.detailed_results["answers"]
 
         # Combine data with a list comprehension
         data = [
@@ -299,7 +348,6 @@ class RagEvaluator:
         result_df.to_csv(output_path, index=False, encoding="utf-8")
 
         logger.info(f"Saved CSV to {output_path}")
-
 
     # def save_results(self, output_path, evaluation_results):
     #     with open(output_path, "w", newline='', encoding="utf-8") as f:
