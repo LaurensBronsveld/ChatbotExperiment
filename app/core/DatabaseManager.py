@@ -1,6 +1,5 @@
-from app.models.models import *
 import logging
-from app.config import settings
+from app.core.config import settings
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from app.models.SQL_models import Base
@@ -24,7 +23,6 @@ engine = create_engine(
 sessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 session_factory = scoped_session(sessionLocal)
 Base.metadata.create_all(engine)
-
 
 
 def get_session():

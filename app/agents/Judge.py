@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 
 from app.agents.system_prompts import get_judge_prompt2
 from app.models.models import JudgeInput, JudgeOutput, ResponseEvaluation
+
 
 class JudgeAgent:
     agent_name = "judge"

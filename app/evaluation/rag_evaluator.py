@@ -318,33 +318,33 @@ class RagEvaluator:
         print(f"Saved CSV to {output_path}")
         print(f"Saved Excel to {output_path.replace('.csv', '.xlsx')}")
 
-    def save_results(
-        self, output_path: str, evaluation_results: RagEvaluationResult
-    ) -> None:
-        retrieval_results = evaluation_results.detailed_results["retrieval"]
-        answer_results = evaluation_results.detailed_results["answers"]
+    # def save_results(
+    #     self, output_path: str, evaluation_results: RagEvaluationResult
+    # ) -> None:
+    #     retrieval_results = evaluation_results.detailed_results["retrieval"]
+    #     answer_results = evaluation_results.detailed_results["answers"]
 
-        # Combine data with a list comprehension
-        data = [
-            {
-                "Question ID": r.get("question_id", "N/A"),
-                "Question": a.get("question", "N/A"),
-                "Golden Answer": a.get("golden_answer", "N/A"),
-                "Generated Answer": a.get("generated_answer", "N/A"),
-                "Golden Sources": ", ".join(r.get("golden_sources", [])),
-                "Retrieved Sources": ", ".join(r.get("retrieved_sources", [])),
-                "Precision": r.get("precision", 0),
-                "Recall": r.get("recall", 0),
-                "F1 Score": r.get("f1_score", 0),
-                "Judge Score": a.get("judge_score", 0),
-                "Judge Evaluation": a.get("judge_evaluation", "N/A"),
-            }
-            for r, a in zip(retrieval_results, answer_results, strict=False)
-        ]
+    #     # Combine data with a list comprehension
+    #     data = [
+    #         {
+    #             "Question ID": r.get("question_id", "N/A"),
+    #             "Question": a.get("question", "N/A"),
+    #             "Golden Answer": a.get("golden_answer", "N/A"),
+    #             "Generated Answer": a.get("generated_answer", "N/A"),
+    #             "Golden Sources": ", ".join(r.get("golden_sources", [])),
+    #             "Retrieved Sources": ", ".join(r.get("retrieved_sources", [])),
+    #             "Precision": r.get("precision", 0),
+    #             "Recall": r.get("recall", 0),
+    #             "F1 Score": r.get("f1_score", 0),
+    #             "Judge Score": a.get("judge_score", 0),
+    #             "Judge Evaluation": a.get("judge_evaluation", "N/A"),
+    #         }
+    #         for r, a in zip(retrieval_results, answer_results, strict=False)
+    #     ]
 
-        result_df = pd.DataFrame(data)
+    #     result_df = pd.DataFrame(data)
 
-        # Save CSV
-        result_df.to_csv(output_path, index=False, encoding="utf-8")
+    #     # Save CSV
+    #     result_df.to_csv(output_path, index=False, encoding="utf-8")
 
-        logger.info(f"Saved CSV to {output_path}")
+    #     logger.info(f"Saved CSV to {output_path}")

@@ -1,12 +1,12 @@
 import tiktoken
 import os
-import fitz  # pymupdf
-import pymupdf4llm # Niet gebruikt in deze file, mogelijk bedoeld voor pdf_document.markdown()
-
-from openai import OpenAI # Niet direct gebruikt, maar OpenAI client wordt later geïnstantieerd.
+import pymupdf4llm
+import asyncio
+from openai import AsyncOpenAI, OpenAIError, OpenAI
 from uuid import uuid4
+import logging
 
-from app.config import settings
+from app.core.config import settings
 from app.models.SQL_models import Document, DocumentType, Chunk
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -30,7 +30,7 @@ class TextChunker:
             data_path (str): The path to the directory containing data to be processed.
             get_session_func (callable): A function that returns a database session when called.
             min_tokens (int, optional): The minimum number of tokens a chunk should ideally have.
-                                        Defaults to 200. 
+                                        Defaults to 200.
             max_tokens (int, optional): The maximum number of tokens for a chunk before splitting.
                                         Defaults to 1000.
             overlap_tokens (int, optional): The number of tokens to overlap between consecutive chunks.
@@ -46,7 +46,7 @@ class TextChunker:
             chunk_size=max_tokens, chunk_overlap=overlap_tokens
         ).from_tiktoken_encoder(model_name=settings.EMBED_MODEL)
 
-    def __enter__(self):
+    async def __aenter__(self):
         """
         Context manager entry point. Obtains a database session and runs the data pipeline.
 
@@ -54,10 +54,10 @@ class TextChunker:
             TextChunker: The instance of the TextChunker itself.
         """
         self.db = next(self.get_session())
-        self.run_data_pipeline()
+        await self.run_data_pipeline()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    async def __aexit__(self, exc_type, exc_value, traceback):
         """
         Context manager exit point. Commits or rolls back the database session and closes it.
 
@@ -92,16 +92,16 @@ class TextChunker:
                 Chunk(
                     document_id=document_id,
                     chunk_metadata=metadata,
-                    chunk=processed_chunk_text.strip(), 
+                    chunk=processed_chunk_text.strip(),
                 )
             )
         else:
-            split_chunks = self.splitter.split_text(processed_chunk_text) 
+            split_chunks = self.splitter.split_text(processed_chunk_text)
             for part in split_chunks:
                 self.chunks.append(
                     Chunk(
                         document_id=document_id,
-                        chunk_metadata=metadata, 
+                        chunk_metadata=metadata,
                         chunk=part.strip(),
                     )
                 )
@@ -126,9 +126,9 @@ class TextChunker:
                     file_extension.lower() in allowed_extensions
                 ):  # Check if extension is allowed
                     try:
-                        doc_id_val = uuid4() 
+                        doc_id_val = uuid4()
                         doc = Document(
-                            id=doc_id_val, 
+                            id=doc_id_val,
                             title=title,
                             type=DocumentType(file_extension.lower()),
                             location=file_path,
@@ -142,7 +142,6 @@ class TextChunker:
                             with open(file_path, "r", encoding="utf-8") as f:
                                 content = f.read()
                         self.docs.append({"doc_id": doc.id, "text": content})
-
                     except Exception as e:
                         print(f"Warning: something went wrong with {file_path}: {e}")
                 else:
@@ -163,34 +162,48 @@ class TextChunker:
             doc_id = doc["doc_id"]
             text = doc["text"]
 
-            self.add_chunk(doc_id, text) 
+            self.add_chunk(doc_id, text)
 
-    def create_embeddings(self, batch_size=500):
+    async def create_embeddings(
+        self, batch_size: int = 70, max_concurrent: int = 10
+    ) -> None:
         """
-        Creates vector embeddings for all chunks in `self.chunks` using OpenAI's API.
-
-        Processes chunks in batches of the specified `batch_size`.
-        The generated embeddings are assigned to the `embedding` attribute of each Chunk object.
+        Asynchronously generate embeddings for all collected chunks.
+        Runs multiple API calls concurrently
 
         Args:
-            batch_size (int, optional): The number of chunks to process in each API call.
-                                        Defaults to 500.
+            batch_size (int): Number of chunks per API call.
+            max_concurrent (int): Maximum number of concurrent embedding requests.
         """
-        client = OpenAI()
-        for i in range(0, len(self.chunks), batch_size):
-            batch = self.chunks[i : i + batch_size]
-            texts = [chunk.chunk for chunk in batch]
-            try:
-                response = client.embeddings.create(
-                    input=texts, model=settings.EMBED_MODEL
-                )
-                print("batch done")
-                # Extract the embeddings from the response
-                embeddings = [entry.embedding for entry in response.data]
-                for chunk, embedding in zip(batch, embeddings):
-                    chunk.embedding = embedding
-            except Exception as e:
-                print(f"Embedding failed with error: {e}")
+        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        semaphore = asyncio.Semaphore(max_concurrent)
+        logging.info("starting embedding")
+        async def process_batch(start_idx: int) -> None:
+            async with semaphore:
+                batch = self.chunks[start_idx : start_idx + batch_size]
+                texts = [chunk.chunk for chunk in batch]
+                
+                try:
+                    response = await client.embeddings.create(
+                        input=texts,
+                        model=settings.EMBED_MODEL,
+                        dimensions=settings.EMBEDDING_DIMENSION,
+                    )
+                    logging.info(f"batch starting at index {start_idx} completed.")
+
+                    embeddings = [entry.embedding for entry in response.data]
+                    for chunk, embedding in zip(batch, embeddings, strict=False):
+                        chunk.embedding = embedding
+
+                except OpenAIError as e:
+                    logging.exception(f"batch starting at index {start_idx} failed:{e}")
+
+        # Schedule all batches concurrently
+        tasks = [
+            asyncio.create_task(process_batch(i))
+            for i in range(0, len(self.chunks), batch_size)
+        ]
+        await asyncio.gather(*tasks)
 
     def add_chunks_to_db(self):
         """
@@ -208,7 +221,7 @@ class TextChunker:
         self.db.query(Document).delete()
         self.db.commit()
 
-    def run_data_pipeline(self):
+    async def run_data_pipeline(self):
         """
         Executes the complete data processing pipeline:
         1. Extracts text from source files.
@@ -219,5 +232,5 @@ class TextChunker:
         # print("run_data_pipeline is called")
         self.extract_text()
         self.split_text_into_chunks()
-        self.create_embeddings()
+        await self.create_embeddings()
         self.add_chunks_to_db()

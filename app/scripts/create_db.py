@@ -1,10 +1,11 @@
 import sys
-from app.components.DatabaseManager import get_session, recreate_tables
+import asyncio
+from app.core.DatabaseManager import get_session, recreate_tables
 from app.components.HandbookTextChunker import HandbookTextChunker
-from app.config import settings
+from app.core.config import settings
 
 
-def create_database(mode: str = "append"):
+async def create_database(mode: str = "append"):
     """
     Initializes or updates the database with data from the specified data_path.
 
@@ -33,7 +34,7 @@ def create_database(mode: str = "append"):
         sys.exit(1)
 
     # go through data pipeline
-    with HandbookTextChunker(
+    async with HandbookTextChunker(
         data_path=data_path, get_session_func=get_session
     ) as chunker:
         pass
@@ -45,4 +46,4 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         mode = sys.argv[1].lower()
 
-    create_database(mode=mode)
+    asyncio.run(create_database(mode=mode))

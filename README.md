@@ -1,4 +1,4 @@
-# Chatbot Experiment
+# Handbook chatbot
 
 ## backend
 

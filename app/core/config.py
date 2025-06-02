@@ -21,11 +21,11 @@ class Settings(BaseSettings):
     )
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"
     API_URL: str = "http://127.0.0.1:8000"
-    HANDBOOK_TABLE: str = "embedded_handbook_with_urls"
-    HISTORY_TABLE: str = "history_table"
     LLM_PROVIDER: str = "open-AI"
     LLM_MODEL: str = "gpt-4o"
-    EMBED_MODEL: str = "text-embedding-3-small"
+    EMBED_MODEL: str = "text-embedding-3-large"
+    EMBEDDING_DIMENSION: int = 2000
+    COHERE_RERANK_MODEL: str = "rerank-v3.5"
     DATA_PATH: str = "data/handbook-main-content"
 
     model_config = ConfigDict(

@@ -80,6 +80,19 @@ class SearchRequest(BaseModel):
     limit: int = 5
 
 
+class ChunkModel(BaseModel):
+    id: int = Field(description="generated id used to cite sources in LLM answer")
+    chunk_id: int = Field(description="id of chunk in database")
+    document_title: str = Field(
+        description="Title of document from which chunk was retrieved"
+    )
+    document_location: str = Field(
+        description="URL or filepath of document from which chunk was retrieved."
+    )
+    text: str = Field(description="Text of chunk")
+    relevance_score: float = Field(description="relevance score determined by Cohere")
+
+
 # conversation history
 class MessageModel(BaseModel):
     role: ChatRole

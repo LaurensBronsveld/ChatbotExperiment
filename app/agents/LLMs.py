@@ -2,7 +2,7 @@ import logging
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.anthropic import AnthropicModel
-from app.config import settings
+from app.core.config import settings
 
 
 def get_model():
@@ -16,7 +16,7 @@ def get_model():
         OpenAIModel | GeminiModel | AnthropicModel | None: An instance of the specified
         LLM provider's model. Returns default OpenAI model if provider is not recognised.
     """
-    
+
     if settings.LLM_PROVIDER.lower() == "open-ai":
         return OpenAIModel(settings.LLM_MODEL)
     elif settings.LLM_PROVIDER.lower() == "google":

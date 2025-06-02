@@ -1,11 +1,8 @@
 import pandas as pd
-from fastapi.testclient import TestClient
-from app.main import app
 from app.tests.example_requests import *
 from app.models.models import *
 
 
-from app.agents.Judge import JudgeAgent
 from app.agents.BaseAgent import BaseAgent
 from app.evaluation.rag_evaluator import RagEvaluator
 

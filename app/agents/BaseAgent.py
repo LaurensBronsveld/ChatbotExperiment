@@ -7,13 +7,19 @@ from pydantic import ValidationError
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ToolReturnPart
 from app.agents.system_prompts import get_chatbot_prompt
-from app.models.models import *
-from app.models.SQL_models import *
+from app.models.models import (
+    MessageModel,
+    RequestModel,
+    ResponseModel,
+    ResponseMetadata,
+    SourceDict,
+)
+from app.models.SQL_models import ChatMessage
 from app.agents.LLMs import get_model
-from app.components.DatabaseManager import get_session
+from app.core.DatabaseManager import get_session
 from app.api.chat.history import get_history
 from app.api.tools.search import search_database
-from app.config import settings
+from app.core.config import settings
 from langfuse import Langfuse
 from langfuse.decorators import observe, langfuse_context
 from uuid import uuid4
@@ -76,7 +82,7 @@ class BaseAgent:
                 return None
         except Exception as e:
             logging.error(f"error retrieving chat history: {e}")
-            return None 
+            return None
 
     def update_chat_history(self, db: object, session_id: UUID, message: MessageModel):
         """
@@ -175,11 +181,10 @@ class BaseAgent:
                         self.update_chat_history(db, session_id, system_message)
 
         # create source objects
-        for source_item in content: 
+        for source_item in content:
             url = source_item["source"]
             id_val = source_item["id"]
             text = source_item["chunk"]
-
 
             url_regex = r"^(https?:\/\/|www\.)\S+$"  # regex which matches most urls starting with http(s)// or www.
             uri_regex = r"^(?:[a-zA-Z]:\\|\/)[^\s]*$"  # regex which matches absolute file paths in windows and unix systems
@@ -210,7 +215,7 @@ class BaseAgent:
         chat history with the assistant's final response.
 
         Args:
-            prompt (list): The user's input/prompt. 
+            prompt (list): The user's input/prompt.
             session_id (str): The unique identifier for the chat session.
             db (object): The SQLAlchemy database session object.
 
@@ -234,7 +239,7 @@ class BaseAgent:
 
         async with agent.run_stream(str(history)) as result:
             sources, tools_used = self.get_tool_results(
-                self, 
+                self,
                 result=result,
                 tool_name="search_tool",
                 db=db,
@@ -313,9 +318,6 @@ class BaseAgent:
         db_generator = get_session()
         db = next(db_generator)
 
-        # start langfuse trace
-        trace = langfuse.trace(name="chat_request")
-
         # add user question to history
         user_message = MessageModel(
             role=ChatRole.USER,
@@ -337,7 +339,7 @@ class BaseAgent:
                         yield chunk
                 break
             except Exception as e:
-                if attempt < retries - 1: 
+                if attempt < retries - 1:
                     logging.error(
                         f"Error: {e} occured while streaming response, repeating attempt"
                     )
@@ -399,9 +401,9 @@ class BaseAgent:
         self.update_chat_history(db, session_id, assistant_message)
 
         sources, tools_used = self.get_tool_results(
-            self, 
+            self,
             result=response,
-            tool_name="use_search_tool", 
+            tool_name="use_search_tool",
             db=db,
             session_id=session_id,
         )
@@ -427,8 +429,6 @@ class BaseAgent:
         runs the agent synchronously, processes tool results, and returns
         the answer and sources.
 
-     
-
         Args:
             request (str): The user's request string.
 
@@ -445,11 +445,8 @@ class BaseAgent:
         agent.tool(self.search_tool)
 
         response = agent.run_sync(request)
-        sources, tools_used = self.get_tool_results( 
-            self, 
-            result=response,
-            tool_name="search_tool",
-            db=db
+        sources, tools_used = self.get_tool_results(
+            self, result=response, tool_name="search_tool", db=db
         )
 
         # Close database session

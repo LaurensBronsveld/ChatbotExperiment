@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 from app.main import app
-from app.tests.example_requests import *
-from app.models.models import *
+from app.tests.example_requests import get_request
+from app.models.models import ResponseModel, ResponseMetadata
 
 import json
 from app.config import settings
@@ -14,6 +14,7 @@ API_URL = "/api"
 
 
 client = TestClient(app)
+
 
 def validate_response(endpoint: str, query: str):
     """
@@ -51,6 +52,7 @@ def validate_response(endpoint: str, query: str):
 
     return metadata, response
 
+
 def test_new_chat_without_RAG():
     """
     Tests if a new session is created if you post a simple question without session_id.
@@ -74,10 +76,12 @@ def test_new_chat_response_with_RAG():
     endpoint = f"{API_URL}/chat_test/"
 
     # get chat response
-    metadata, response = validate_response(endpoint, "Hoe kan ik ziekte verlof aanvragen?")
+    metadata, response = validate_response(
+        endpoint, "Hoe kan ik ziekte verlof aanvragen?"
+    )
 
     # assert it was able to answer the question
-    assert response["able_to_answer"] == True
+    assert response["able_to_answer"]
     global SESSION_ID
     SESSION_ID = metadata["session_id"]
 
@@ -90,7 +94,9 @@ def test_follow_up_question():
     """
     endpoint = f"{API_URL}/chat_test/{SESSION_ID}/"
 
-    metadata, response = validate_response(endpoint, "Herhaal mijn eerste vraag woord voor woord?")
+    metadata, response = validate_response(
+        endpoint, "Herhaal mijn eerste vraag woord voor woord?"
+    )
 
     assert "Hoe kan ik ziekte verlof aanvragen?" in response["content"]
 

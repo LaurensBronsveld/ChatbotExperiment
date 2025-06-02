@@ -17,6 +17,8 @@ from sqlalchemy import (
     event,
 )
 
+from app.core.config import settings
+
 Base = declarative_base()
 
 
@@ -53,8 +55,8 @@ class Chunk(Base):
     chunk_metadata = Column(JSON)
     chunk = Column(String, nullable=False)
     embedding = Column(
-        Vector(1536)
-    )  # vector for dense search, currently using embedding_small from OpenAI
+        Vector(settings.EMBEDDING_DIMENSION)  # Dimension of the vector)
+    )  # vector for dense search, currently using embedding_large from OpenAI
     chunk_tsv = Column(TSVECTOR)  # vector for sparse search
     document: Mapped["Document"] = relationship(
         back_populates="chunks"
@@ -66,7 +68,7 @@ class Chunk(Base):
         Index(
             "idx_gin_chunk_tsv",  # Index name
             "chunk_tsv",  # Column to index
-            postgresql_using="gin",  # Index type (GIN is best for tsvector)
+            postgresql_using="gin",  # Index type 
         ),
         # HNSW index
         Index(
@@ -76,10 +78,10 @@ class Chunk(Base):
             postgresql_with={
                 "m": 16,
                 "ef_construction": 64,
-            },  # Example parameters (tune these)
+            },  
             postgresql_ops={
                 "embedding": "vector_cosine_ops"
-            },  # Operator class (use cosine, l2, or ip based on your distance metric)
+            },  
         ),
     )
 
